@@ -102,6 +102,29 @@ void main() {
     });
   });
 
+  group('HuddleRules.caller', () {
+    HuddleMember m(String uid, int joinedAt) =>
+        HuddleMember(uid: uid, name: uid, emoji: '🎧', color: 0, sid: 'sid-$uid', joinedAt: joinedAt);
+    const now = 100000;
+
+    test('rings for the starter of a huddle that just began', () {
+      expect(HuddleRules.caller([m('maya', now - 2000)], myUid: 'me', knewOne: false, nowMs: now)?.uid, 'maya');
+      // Others joining later don't change who started it.
+      expect(
+        HuddleRules.caller([m('maya', now - 5000), m('dev', now - 1000)], myUid: 'me', knewOne: false, nowMs: now)?.uid,
+        'maya',
+      );
+    });
+
+    test('stays quiet for huddles already known, stale, empty, or ours', () {
+      expect(HuddleRules.caller([m('maya', now - 2000)], myUid: 'me', knewOne: true, nowMs: now), isNull);
+      final stale = now - HuddleRules.ringTime.inMilliseconds;
+      expect(HuddleRules.caller([m('maya', stale)], myUid: 'me', knewOne: false, nowMs: now), isNull);
+      expect(HuddleRules.caller(const [], myUid: 'me', knewOne: false, nowMs: now), isNull);
+      expect(HuddleRules.caller([m('maya', now), m('me', now)], myUid: 'me', knewOne: false, nowMs: now), isNull);
+    });
+  });
+
   test('HuddleMember needs a session id and defaults to mic on, camera off', () {
     expect(HuddleMember.fromJson('u', {'name': 'x'}), isNull);
     final m = HuddleMember.fromJson('u', {'name': 'maya', 'sid': 'abcdefgh', 'joinedAt': 5})!;

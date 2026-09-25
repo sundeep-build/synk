@@ -28,9 +28,14 @@ final huddleServiceProvider = Provider<HuddleForegroundService>((ref) => const H
 
 /// Who's in a room's huddle, for the banner, whether or not you've joined.
 /// Listens only while a room screen shows it.
-final huddleMembersProvider = StreamProvider.autoDispose.family<List<HuddleMember>, String>(
-  (ref, roomId) => ref.watch(huddleSignalingProvider).members(roomId),
-);
+final huddleMembersProvider = StreamProvider.autoDispose.family<List<HuddleMember>, String>((ref, roomId) {
+  // Re-opened after a dropped connection, like the chat: the rules only serve
+  // it to people in the room.
+  ref.listen(roomSessionProvider.select((s) => s?.rejoins), (before, now) {
+    if (before != null && now != null && now > before) ref.invalidateSelf();
+  });
+  return ref.watch(huddleSignalingProvider).members(roomId);
+});
 
 /// The user's huddle. Kept alive like the room session, so the call goes on
 /// while they browse other tabs or lock the phone.

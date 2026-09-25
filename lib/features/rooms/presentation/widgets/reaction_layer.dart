@@ -39,6 +39,8 @@ class ReactionLayerState extends ConsumerState<ReactionLayer> {
   @override
   Widget build(BuildContext context) {
     ref.listen(roomReactionsProvider(widget.roomId), (_, next) {
+      // Only fresh reactions: a re-opening stream still carries the last one.
+      if (next is! AsyncData) return;
       final r = next.value;
       // Our own taps were already spawned locally.
       if (r != null && r.uid != widget.myUid) spawn(r.emoji);

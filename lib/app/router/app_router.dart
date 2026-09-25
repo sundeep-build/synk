@@ -14,6 +14,7 @@ import '../../features/library/presentation/playlist_screen.dart';
 import '../../features/player/presentation/now_playing_screen.dart';
 import '../../features/profile/presentation/onboarding_screen.dart';
 import '../../features/profile/presentation/profile_screen.dart';
+import '../../features/rooms/presentation/incoming_huddle.dart';
 import '../../features/rooms/presentation/join_screen.dart';
 import '../../features/rooms/presentation/live_rooms_screen.dart';
 import '../../features/rooms/presentation/room_screen.dart';
@@ -100,6 +101,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/join/:code',
         parentNavigatorKey: _rootKey,
         builder: (_, s) => JoinScreen(code: s.pathParameters['code']!),
+      ),
+      GoRoute(
+        path: Routes.incomingHuddle,
+        parentNavigatorKey: _rootKey,
+        pageBuilder: (_, s) => _slideUp(s, const IncomingHuddleScreen()),
       ),
     ],
   );

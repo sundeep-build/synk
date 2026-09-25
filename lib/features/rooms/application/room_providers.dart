@@ -12,6 +12,7 @@ import '../data/room_repository.dart';
 import '../domain/room.dart';
 import '../domain/room_live_models.dart';
 import '../sync/server_clock.dart';
+import 'room_session_controller.dart';
 
 final roomRepositoryProvider = Provider<RoomRepository>(
   (ref) => RoomRepository(ref.watch(firestoreProvider), ref.watch(databaseProvider)),
@@ -155,17 +156,30 @@ class RoomChatController extends Notifier<List<ChatMessage>> {
 
   final String roomId;
 
+  StreamSubscription<ChatMessage>? _sub;
+
   @override
   List<ChatMessage> build() {
-    final sub = ref
-        .watch(roomLiveProvider)
-        .chat(roomId)
-        .listen(_append, onError: (Object e, StackTrace st) => AppLogger.error('Chat', e, st));
-    ref.onDispose(sub.cancel);
+    final live = ref.watch(roomLiveProvider);
+    void open() {
+      unawaited(_sub?.cancel());
+      _sub = live.chat(roomId).listen(_append, onError: (Object e, StackTrace st) => AppLogger.error('Chat', e, st));
+    }
+
+    open();
+    // Only people in the room may read its chat, so after a dropped
+    // connection the server refuses to resume this stream until the session
+    // has put us back in the room. Open it again then.
+    ref.listen(roomSessionProvider.select((s) => s?.rejoins), (before, now) {
+      if (before != null && now != null && now > before) open();
+    });
+    ref.onDispose(() => _sub?.cancel());
     return const [];
   }
 
   void _append(ChatMessage m) {
+    // Re-opening replays the last page: keep only what's new.
+    if (state.any((c) => c.id == m.id)) return;
     final next = [...state, m];
     final overflow = next.length - AppConfig.chatMemoryCap;
     state = overflow > 0 ? next.sublist(overflow) : next;
@@ -174,6 +188,10 @@ class RoomChatController extends Notifier<List<ChatMessage>> {
 
 /// Emoji bursts sent after the screen opened (never replays old ones).
 final roomReactionsProvider = StreamProvider.autoDispose.family<Reaction, String>((ref, roomId) {
+  // Re-opened after a dropped connection, like the chat.
+  ref.listen(roomSessionProvider.select((s) => s?.rejoins), (before, now) {
+    if (before != null && now != null && now > before) ref.invalidateSelf();
+  });
   final since = ref.read(serverClockProvider).nowMs();
   return ref.watch(roomLiveProvider).reactions(roomId, sinceServerMs: since);
 });

@@ -61,6 +61,7 @@ class RoomSessionController extends Notifier<RoomSession?> implements TransportD
   DateTime _lastBeatAt = DateTime.fromMillisecondsSinceEpoch(0);
   DateTime _lastDriftSeek = DateTime.fromMillisecondsSinceEpoch(0);
   bool _joining = false;
+  bool _restoringPresence = false;
 
   PlayerHub get _audio => ref.read(playerHubProvider);
   RoomLiveDataSource get _live => ref.read(roomLiveProvider);
@@ -218,7 +219,36 @@ class RoomSessionController extends Notifier<RoomSession?> implements TransportD
 
   void _onMembers(List<RoomMember> members) {
     _update((s) => s.copyWith(members: members));
+    final s = state;
+    if (s != null && !s.ended && !members.any((m) => m.uid == s.myUid)) unawaited(_restorePresence(s));
     _maybeHeartbeat();
+  }
+
+  /// A dropped connection (screen off, Wi-Fi ↔ mobile data) fires our
+  /// disconnect cleanup on the server, which takes us out of the room while
+  /// the app is still in it. Others' counts then miss us, and every rule that
+  /// needs us in the room (chat, queue, reactions, huddle) refuses us. Nothing
+  /// else puts us back, so announce ourselves again.
+  Future<void> _restorePresence(RoomSession s) async {
+    if (_restoringPresence) return;
+    _restoringPresence = true;
+    final roomId = s.room.id;
+    try {
+      await _live.join(roomId, _me);
+      final cur = state;
+      if (cur == null || cur.ended || cur.room.id != roomId) {
+        // Left while this was in flight: don't leave a ghost behind.
+        await _live.leave(roomId, s.myUid);
+        return;
+      }
+      _update((cur) => cur.copyWith(rejoins: cur.rejoins + 1));
+    } catch (e, st) {
+      // Room ended meanwhile (_onMeta handles it), or offline: the next
+      // members update tries again.
+      AppLogger.error('RoomPresence', e, st);
+    } finally {
+      _restoringPresence = false;
+    }
   }
 
   void _onQueue(List<QueueItem> queue) {

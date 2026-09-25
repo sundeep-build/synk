@@ -64,6 +64,25 @@ abstract final class HuddleRules {
 
   static String _join(Map<String, String> params) => [for (final e in params.entries) '${e.key}=${e.value}'].join(';');
 
+  // ── Ringing ──────────────────────────────────────────────────────────────
+  /// How long a new huddle rings for everyone else in the room.
+  static const Duration ringTime = Duration(seconds: 30);
+
+  /// Whom to ring for when a room's huddle list ([members], earliest first)
+  /// changes: the starter of a huddle that's new to us ([knewOne] false: the
+  /// last list we saw was empty, or this is the first) and started within
+  /// [ringTime], unless we're already in it.
+  static HuddleMember? caller(
+    List<HuddleMember> members, {
+    required String myUid,
+    required bool knewOne,
+    required int nowMs,
+  }) {
+    if (knewOne || members.isEmpty || members.any((m) => m.uid == myUid)) return null;
+    final starter = members.first;
+    return nowMs - starter.joinedAt < ringTime.inMilliseconds ? starter : null;
+  }
+
   // ── Recovery ─────────────────────────────────────────────────────────────
   /// A dropped connection is rebuilt this many times before giving up on
   /// that peer (until either of you rejoins).

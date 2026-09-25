@@ -6,6 +6,7 @@ import '../core/design_system/design_system.dart';
 import '../core/di/core_providers.dart';
 import '../features/player/presentation/floating_video.dart';
 import '../features/player/presentation/pip_host.dart';
+import '../features/rooms/presentation/incoming_huddle.dart';
 import 'router/app_router.dart';
 
 class SynkApp extends ConsumerWidget {
@@ -27,7 +28,8 @@ class SynkApp extends ConsumerWidget {
       // Respect large text settings, but cap extreme scales that would break
       // fixed-size artwork layouts. The floating video sits above every route
       // so a minimised video keeps playing while the user browses; PipHost
-      // swaps in the video alone when Android shows the app in PiP.
+      // swaps in the video alone when Android shows the app in PiP. The
+      // incoming-huddle host rings from any screen.
       builder: (context, child) => MediaQuery(
         data: MediaQuery.of(context).copyWith(textScaler: MediaQuery.textScalerOf(context).clamp(maxScaleFactor: 1.35)),
         child: PipHost(
@@ -35,6 +37,7 @@ class SynkApp extends ConsumerWidget {
             children: [
               child!,
               const Positioned.fill(child: FloatingVideo()),
+              const IncomingHuddleHost(),
             ],
           ),
         ),

@@ -21,6 +21,7 @@ class RoomSession {
     this.locallyPaused = false,
     this.songEnded = false,
     this.ended = false,
+    this.rejoins = 0,
   });
 
   final Room room;
@@ -49,6 +50,11 @@ class RoomSession {
 
   /// The host closed the room while we were in it.
   final bool ended;
+
+  /// Times a dropped connection removed us from the room and the session put
+  /// us back. Streams the rules only serve to people in the room (chat,
+  /// reactions) re-open when it goes up.
+  final int rejoins;
 
   bool get isHost => room.hostId == myUid;
   bool get hostPresent => members.any((m) => m.uid == room.hostId);
@@ -96,6 +102,7 @@ class RoomSession {
     bool? locallyPaused,
     bool? songEnded,
     bool? ended,
+    int? rejoins,
   }) => RoomSession(
     room: room ?? this.room,
     myUid: myUid,
@@ -108,5 +115,6 @@ class RoomSession {
     locallyPaused: locallyPaused ?? this.locallyPaused,
     songEnded: songEnded ?? this.songEnded,
     ended: ended ?? this.ended,
+    rejoins: rejoins ?? this.rejoins,
   );
 }

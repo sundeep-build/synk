@@ -18,6 +18,12 @@ abstract final class Routes {
   static const trending = '$home/trending';
   static String join(String code) => '/join/$code';
 
+  /// Full-screen "someone started a huddle" page (Join / Decline).
+  static const incomingHuddle = '/huddle/incoming';
+
+  /// The room a [room] path shows, or null for any other path.
+  static String? roomIn(String path) => path.startsWith('/room/') ? path.substring('/room/'.length) : null;
+
   /// Screens that exist only before the user is fully signed in.
   static const gate = {splash, welcome, onboarding};
 }

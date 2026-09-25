@@ -1,5 +1,7 @@
 package club.buildd.synk
 
+import android.Manifest
+import android.app.KeyguardManager
 import android.app.PictureInPictureParams
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -7,6 +9,7 @@ import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
 import android.util.Rational
+import android.view.WindowManager
 import androidx.lifecycle.Lifecycle
 import com.ryanheise.audioservice.AudioServiceActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -18,9 +21,24 @@ import io.flutter.plugin.common.MethodChannel
 // Picture-in-picture for videos (see lib/features/player/data/picture_in_picture.dart):
 // Dart arms it while a video plays; leaving the app then shrinks it into the
 // system PiP window instead of pausing the video.
+//
+// Incoming huddles (HuddleRinger.kt): opened from the call notification, the
+// activity shows over the lock screen until Dart releases it.
 class MainActivity : AudioServiceActivity() {
     private var pipChannel: MethodChannel? = null
     private var pipArmed = false
+    private var ringChannel: MethodChannel? = null
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        handleRingIntent(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleRingIntent(intent)
+    }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -55,6 +73,86 @@ class MainActivity : AudioServiceActivity() {
                 result.error("huddle_service", e.message, null)
             }
         }
+        // Incoming huddles: ringtone, call notification, lock screen (HuddleRinger.kt).
+        ringChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "club.buildd.synk/huddle_ring").apply {
+            setMethodCallHandler { call, result ->
+                try {
+                    when (call.method) {
+                        "show" -> HuddleRinger.show(
+                            applicationContext,
+                            call.argument<String>("caller").orEmpty(),
+                            call.argument<String>("room").orEmpty(),
+                        )
+                        "cancel" -> HuddleRinger.cancel(applicationContext)
+                        "ringtone" -> if (call.arguments == true) {
+                            HuddleRinger.startRingtone(applicationContext)
+                        } else {
+                            HuddleRinger.stopRingtone()
+                        }
+                        "release" -> releaseLockScreen(call.argument<Boolean>("unlock") == true)
+                        "requestPermission" -> requestNotificationPermission()
+                        else -> return@setMethodCallHandler result.notImplemented()
+                    }
+                    result.success(null)
+                } catch (e: Exception) {
+                    result.error("huddle_ring", e.message, null)
+                }
+            }
+        }
+        HuddleRinger.channel = ringChannel
+    }
+
+    // ── Incoming huddles ────────────────────────────────────────────────────
+    // Opened from the call notification: full-screen intent, body tap, or Join.
+    private fun handleRingIntent(intent: Intent?) {
+        val action = intent?.getStringExtra(HuddleRinger.EXTRA_ACTION) ?: return
+        intent.removeExtra(HuddleRinger.EXTRA_ACTION)
+        // Reopened from Recents with the old intent: nothing is ringing.
+        if (intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0) return
+        showOverLockScreen(true)
+        if (action == HuddleRinger.ACTION_ACCEPT) {
+            HuddleRinger.cancel(this)
+            ringChannel?.invokeMethod("action", "accept")
+        }
+    }
+
+    private fun showOverLockScreen(on: Boolean) {
+        if (isFinishing || isDestroyed) return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+            setShowWhenLocked(on)
+            setTurnScreenOn(on)
+        } else {
+            @Suppress("DEPRECATION")
+            val flags = WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
+            if (on) window.addFlags(flags) else window.clearFlags(flags)
+        }
+    }
+
+    // Done ringing. Answered on the lock screen ([unlock]): ask to unlock
+    // first, so the user lands in the huddle. The call goes on either way.
+    private fun releaseLockScreen(unlock: Boolean) {
+        val keyguard = getSystemService(KEYGUARD_SERVICE) as KeyguardManager
+        if (unlock && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && keyguard.isKeyguardLocked && !isFinishing && !isDestroyed) {
+            keyguard.requestDismissKeyguard(
+                this,
+                object : KeyguardManager.KeyguardDismissCallback() {
+                    override fun onDismissSucceeded() = showOverLockScreen(false)
+
+                    override fun onDismissCancelled() = showOverLockScreen(false)
+
+                    override fun onDismissError() = showOverLockScreen(false)
+                },
+            )
+        } else {
+            showOverLockScreen(false)
+        }
+    }
+
+    // Android 13+: without it the call notification can't show or ring.
+    private fun requestNotificationPermission() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU || isFinishing || isDestroyed) return
+        if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) return
+        requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), NOTIFICATION_PERMISSION_REQUEST)
     }
 
     private fun pipSupported(): Boolean =
@@ -100,5 +198,9 @@ class MainActivity : AudioServiceActivity() {
         // resuming it the next time the app opens.
         val dismissed = !isInPictureInPictureMode && lifecycle.currentState == Lifecycle.State.CREATED
         pipChannel?.invokeMethod("changed", mapOf("inPip" to isInPictureInPictureMode, "dismissed" to dismissed))
+    }
+
+    private companion object {
+        const val NOTIFICATION_PERMISSION_REQUEST = 7203
     }
 }
