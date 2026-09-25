@@ -14,11 +14,12 @@ class LocalStore {
   static const _kRecentSearches = 'recent_searches';
   static const _kRecentTracks = 'recent_tracks';
   static const _kVideoSearchCache = 'video_search_cache';
+  static const _kRooms = 'rooms';
 
   static Future<LocalStore> create() async {
     final prefs = await SharedPreferencesWithCache.create(
       cacheOptions: const SharedPreferencesWithCacheOptions(
-        allowList: {_kThemeMode, _kRecentSearches, _kRecentTracks, _kVideoSearchCache},
+        allowList: {_kThemeMode, _kRecentSearches, _kRecentTracks, _kVideoSearchCache, _kRooms},
       ),
     );
     return LocalStore(prefs);
@@ -53,6 +54,20 @@ class LocalStore {
     final next = [json, ...recentTracks.where((m) => m['id'] != id)].take(30).map(jsonEncode).toList();
     return _prefs.setStringList(_kRecentTracks, next);
   }
+
+  /// Rooms joined on this device (see `RememberedRooms`), as JSON.
+  Map<String, Object?>? get rooms {
+    final raw = _prefs.getString(_kRooms);
+    if (raw == null) return null;
+    try {
+      final decoded = jsonDecode(raw);
+      return decoded is Map<String, Object?> ? decoded : null;
+    } on FormatException {
+      return null;
+    }
+  }
+
+  Future<void> setRooms(Map<String, Object?> json) => _prefs.setString(_kRooms, jsonEncode(json));
 
   /// Persisted YouTube search results: a search costs 100 of the API's 10,000
   /// daily units, so the same query is never paid for twice within [ttl],

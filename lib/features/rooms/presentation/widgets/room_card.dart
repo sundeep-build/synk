@@ -270,15 +270,17 @@ class RoomTile extends StatelessWidget {
   }
 }
 
-/// A room you host, on Home → Your rooms: live, or paused until you're back.
-/// Tap to (re)open it; the menu shares or ends it.
+/// A room on Home → Your rooms: one you host (live, or paused until you're
+/// back) or one you joined. Tap to (re)open it; the menu shares it, and ends
+/// it (host) or takes it off the list (joined).
 class MyRoomCard extends StatelessWidget {
   const MyRoomCard({
     required this.room,
     required this.here,
     required this.onOpen,
     required this.onShare,
-    required this.onEnd,
+    this.onEnd,
+    this.onRemove,
     super.key,
   });
 
@@ -288,7 +290,12 @@ class MyRoomCard extends StatelessWidget {
   final bool here;
   final VoidCallback onOpen;
   final VoidCallback onShare;
-  final VoidCallback onEnd;
+
+  /// Host only: end it for everyone.
+  final VoidCallback? onEnd;
+
+  /// Joined rooms: take it off the list.
+  final VoidCallback? onRemove;
 
   static const double width = 272;
 
@@ -300,6 +307,9 @@ class MyRoomCard extends StatelessWidget {
         ? ("You're in it", context.colors.primary)
         : active
         ? ('Live · ${Formatters.compact(room.listenerCount)} listening', c.live)
+        // Only its host can bring a paused room back.
+        : onEnd == null && !room.isLive
+        ? ('Waiting for the host', c.textSecondary)
         : ('Paused · tap to open', c.textSecondary);
     final np = room.nowPlaying;
 
@@ -360,13 +370,19 @@ class MyRoomCard extends StatelessWidget {
               PopupMenuButton<String>(
                 tooltip: 'Room options',
                 icon: Icon(Icons.more_vert_rounded, color: c.textSecondary),
-                onSelected: (v) => v == 'end' ? onEnd() : onShare(),
-                itemBuilder: (_) => const [
-                  PopupMenuItem(value: 'share', child: Text('Invite friends')),
-                  PopupMenuItem(
-                    value: 'end',
-                    child: Text('End room for everyone', style: TextStyle(color: SynkPalette.danger)),
-                  ),
+                onSelected: (v) => switch (v) {
+                  'end' => onEnd?.call(),
+                  'remove' => onRemove?.call(),
+                  _ => onShare(),
+                },
+                itemBuilder: (_) => [
+                  const PopupMenuItem(value: 'share', child: Text('Invite friends')),
+                  if (onEnd != null)
+                    const PopupMenuItem(
+                      value: 'end',
+                      child: Text('End room for everyone', style: TextStyle(color: SynkPalette.danger)),
+                    ),
+                  if (onRemove != null) const PopupMenuItem(value: 'remove', child: Text('Remove from list')),
                 ],
               ),
             ],

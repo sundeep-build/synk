@@ -238,8 +238,9 @@ class _ActionCard extends StatelessWidget {
   }
 }
 
-/// Rooms you host, so you can get back into one after closing the app
-/// (it drops out of Live now once everyone has left). Hidden when you have none.
+/// Rooms you host or joined, so you can get back into one after closing the
+/// app without its code (it drops out of Live now once everyone has left, and
+/// private rooms are never there). Hidden when you have none.
 class _MyRooms extends ConsumerStatefulWidget {
   const _MyRooms();
 
@@ -291,6 +292,8 @@ class _MyRoomsState extends ConsumerState<_MyRooms> {
         await ref.read(roomSessionProvider.notifier).leave(endForAll: true);
       } else {
         await ref.read(roomRepositoryProvider).close(room.id);
+        final uid = ref.read(currentProfileProvider)?.uid;
+        if (uid != null) await ref.read(roomMemoryProvider).forget(uid, room.id);
       }
       ref
         ..invalidate(myRoomsProvider)
@@ -298,6 +301,13 @@ class _MyRoomsState extends ConsumerState<_MyRooms> {
     } catch (e) {
       if (mounted) context.showError(e);
     }
+  }
+
+  Future<void> _remove(Room room) async {
+    final uid = ref.read(currentProfileProvider)?.uid;
+    if (uid == null) return;
+    await ref.read(roomMemoryProvider).forget(uid, room.id);
+    ref.invalidate(myRoomsProvider);
   }
 
   @override
@@ -319,6 +329,7 @@ class _MyRoomsState extends ConsumerState<_MyRooms> {
     }
     if (rooms.isEmpty) return const SizedBox.shrink();
     final hereId = ref.watch(roomSessionProvider.select((s) => s?.room.id));
+    final myUid = ref.watch(currentProfileProvider.select((p) => p?.uid));
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -343,7 +354,8 @@ class _MyRoomsState extends ConsumerState<_MyRooms> {
                         'Room "${room.name}" — code ${room.code}\n${room.inviteLink}',
                   ),
                 ),
-                onEnd: () => _end(room),
+                onEnd: room.hostId == myUid ? () => _end(room) : null,
+                onRemove: room.hostId == myUid ? null : () => _remove(room),
               );
             },
           ),

@@ -5,10 +5,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/config/app_config.dart';
 import '../../../core/di/core_providers.dart';
+import '../../../core/error/app_exception.dart';
 import '../../../core/logging/app_logger.dart';
 import '../../auth/application/session.dart';
 import '../data/room_live_datasource.dart';
+import '../data/room_memory.dart';
 import '../data/room_repository.dart';
+import '../domain/remembered_rooms.dart';
 import '../domain/room.dart';
 import '../domain/room_live_models.dart';
 import '../sync/server_clock.dart';
@@ -35,21 +38,47 @@ final liveRoomsProvider = FutureProvider.autoDispose<List<Room>>((ref) async {
   return ref.watch(roomRepositoryProvider).liveRooms();
 });
 
-/// Rooms you host that haven't been ended (Home → Your rooms), so you can
-/// reopen one after closing the app. One small query, cached for 60s.
+/// Rooms joined on this device, per user (see [RememberedRooms]).
+final roomMemoryProvider = Provider<RoomMemory>((ref) => RoomMemory(ref.watch(localStoreProvider)));
+
+/// Home → Your rooms: rooms you host that haven't been ended, then rooms you
+/// joined on this device, newest first. Either way you get back in with a
+/// tap after closing the app, no code needed. One small query plus a read
+/// per joined room (at most [RememberedRooms.max]), cached for 60s.
 final myRoomsProvider = FutureProvider.autoDispose<List<Room>>((ref) async {
   final uid = ref.watch(currentProfileProvider.select((p) => p?.uid));
   if (uid == null) return const [];
   final link = ref.keepAlive();
   final timer = Timer(const Duration(seconds: 60), link.close);
   ref.onDispose(timer.cancel);
+  final rooms = ref.watch(roomRepositoryProvider);
+  final memory = ref.watch(roomMemoryProvider);
   try {
-    return await ref.watch(roomRepositoryProvider).hostedBy(uid);
+    final hosted = await rooms.hostedBy(uid);
+    final joinedIds = memory.of(uid).joined.where((id) => !hosted.any((r) => r.id == id)).toList();
+    final joined = await Future.wait(joinedIds.map((id) => _openRoom(rooms, memory, uid, id)));
+    return [...hosted, ...joined.nonNulls];
   } catch (e, st) {
     AppLogger.error('MyRooms', e, st);
     rethrow;
   }
 });
+
+/// A joined room, or null once it has ended or been deleted (it's forgotten
+/// then). Offline or other errors: skipped this time, still remembered.
+Future<Room?> _openRoom(RoomRepository rooms, RoomMemory memory, String uid, String roomId) async {
+  try {
+    final room = await rooms.get(roomId);
+    if (!room.closed) return room;
+  } on NotFoundException {
+    // Deleted: forget it below.
+  } catch (e, st) {
+    AppLogger.error('MyRooms', e, st);
+    return null;
+  }
+  unawaited(memory.forget(uid, roomId));
+  return null;
+}
 
 /// Live now lists other people's rooms only: yours are under Your rooms, and
 /// the one you're in is already on your screen.

@@ -15,6 +15,7 @@ import '../../player/application/player_providers.dart';
 import '../../player/data/synk_audio_handler.dart';
 import '../../profile/domain/user_profile.dart';
 import '../data/room_live_datasource.dart';
+import '../data/room_memory.dart';
 import '../data/room_repository.dart';
 import '../domain/room.dart';
 import '../domain/room_live_models.dart';
@@ -66,6 +67,7 @@ class RoomSessionController extends Notifier<RoomSession?> implements TransportD
   PlayerHub get _audio => ref.read(playerHubProvider);
   RoomLiveDataSource get _live => ref.read(roomLiveProvider);
   RoomRepository get _rooms => ref.read(roomRepositoryProvider);
+  RoomMemory get _memory => ref.read(roomMemoryProvider);
   ServerClock get _clock => ref.read(serverClockProvider);
 
   UserProfile get _me {
@@ -104,7 +106,8 @@ class RoomSessionController extends Notifier<RoomSession?> implements TransportD
 
       await _live.join(roomId, me);
       state = RoomSession(room: room, myUid: me.uid);
-      if (isHost) ref.invalidate(myRoomsProvider);
+      // Listed on Home, and reopened if the app closes while we're in it.
+      unawaited(_memory.joined(me.uid, roomId).then((_) => ref.invalidate(myRoomsProvider)));
       _audio.delegate = this;
       _subscribe(roomId);
       _syncTimer = Timer.periodic(const Duration(seconds: 1), (_) => _tick());
@@ -132,9 +135,12 @@ class RoomSessionController extends Notifier<RoomSession?> implements TransportD
     // any network wait. Otherwise the room's player unmounts first and the
     // floating player picks the video back up after the user has left.
     final handBack = _handBackAudio();
+    // Left on purpose: don't reopen it on the next launch.
+    final ending = endForAll && s.isHost;
+    unawaited(ending ? _memory.forget(s.myUid, s.room.id) : _memory.left(s.myUid));
     try {
       if (!s.ended) await _live.leave(s.room.id, s.myUid);
-      if (endForAll && s.isHost) {
+      if (ending) {
         await _rooms.close(s.room.id);
       } else if (!s.ended && s.members.every((m) => m.uid == s.myUid)) {
         await _rooms.markIdle(s.room.id);
@@ -142,7 +148,7 @@ class RoomSessionController extends Notifier<RoomSession?> implements TransportD
     } catch (e, st) {
       AppLogger.error('RoomLeave', e, st);
     }
-    if (s.isHost) ref.invalidate(myRoomsProvider);
+    ref.invalidate(myRoomsProvider);
     await handBack;
   }
 
@@ -213,6 +219,7 @@ class RoomSessionController extends Notifier<RoomSession?> implements TransportD
     if (s == null || !(meta?.closed ?? false) || s.isHost) return;
     _teardown();
     state = s.copyWith(ended: true);
+    unawaited(_memory.forget(s.myUid, s.room.id));
     unawaited(_live.leave(s.room.id, s.myUid).catchError((Object _) {}));
     unawaited(_handBackAudio());
   }

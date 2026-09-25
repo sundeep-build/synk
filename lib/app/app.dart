@@ -7,6 +7,7 @@ import '../core/di/core_providers.dart';
 import '../features/player/presentation/floating_video.dart';
 import '../features/player/presentation/pip_host.dart';
 import '../features/rooms/presentation/incoming_huddle.dart';
+import '../features/rooms/presentation/room_resume.dart';
 import 'router/app_router.dart';
 
 class SynkApp extends ConsumerWidget {
@@ -29,7 +30,8 @@ class SynkApp extends ConsumerWidget {
       // fixed-size artwork layouts. The floating video sits above every route
       // so a minimised video keeps playing while the user browses; PipHost
       // swaps in the video alone when Android shows the app in PiP. The
-      // incoming-huddle host rings from any screen.
+      // incoming-huddle host rings from any screen, and the resumer reopens
+      // the room the app was closed in.
       builder: (context, child) => MediaQuery(
         data: MediaQuery.of(context).copyWith(textScaler: MediaQuery.textScalerOf(context).clamp(maxScaleFactor: 1.35)),
         child: PipHost(
@@ -38,6 +40,7 @@ class SynkApp extends ConsumerWidget {
               child!,
               const Positioned.fill(child: FloatingVideo()),
               const IncomingHuddleHost(),
+              const RoomResumer(),
             ],
           ),
         ),
