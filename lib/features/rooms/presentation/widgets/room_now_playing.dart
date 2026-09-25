@@ -26,10 +26,20 @@ class RoomNowPlaying extends ConsumerWidget {
     final canControl = ref.watch(roomSessionProvider.select((s) => s?.canControl ?? false));
     final radio = ref.watch(roomSessionProvider.select((s) => s?.room.mode == RoomMode.radio));
     final track = playback?.track;
+    final songEnded = ref.watch(roomSessionProvider.select((s) => s?.songEnded ?? false));
+    final nextQueued = ref.watch(roomSessionProvider.select((s) => s?.upcoming.isNotEmpty ?? false));
     final controller = ref.read(roomSessionProvider.notifier);
 
-    if (track == null) {
-      return _IdlePanel(radio: radio, canControl: canControl, compact: compact);
+    // No song yet, or the last one ended with nothing after it: say so, and
+    // offer to add one, rather than showing an empty (black) video player.
+    if (track == null || songEnded) {
+      return _IdlePanel(
+        radio: radio,
+        canControl: canControl,
+        compact: compact,
+        ended: track != null,
+        nextQueued: nextQueued,
+      );
     }
 
     final liked = ref.watch(likedIdsProvider.select((ids) => ids.contains(track.id)));
@@ -230,11 +240,23 @@ class _SkipButton extends ConsumerWidget {
 }
 
 class _IdlePanel extends StatelessWidget {
-  const _IdlePanel({required this.radio, required this.canControl, required this.compact});
+  const _IdlePanel({
+    required this.radio,
+    required this.canControl,
+    required this.compact,
+    this.ended = false,
+    this.nextQueued = false,
+  });
 
   final bool radio;
   final bool canControl;
   final bool compact;
+
+  /// A song just finished and the room hasn't moved on yet.
+  final bool ended;
+
+  /// …and a queued song is about to start.
+  final bool nextQueued;
 
   @override
   Widget build(BuildContext context) {
@@ -246,21 +268,32 @@ class _IdlePanel extends StatelessWidget {
         padding: const EdgeInsets.all(Space.xl),
         child: Column(
           children: [
-            Icon(radio ? Icons.radio_rounded : Icons.queue_music_rounded, size: 40, color: context.colors.primary),
+            Icon(
+              ended ? Icons.music_off_rounded : (radio ? Icons.radio_rounded : Icons.queue_music_rounded),
+              size: 40,
+              color: context.colors.primary,
+            ),
             const SizedBox(height: Space.md),
-            Text('Nothing playing yet', style: context.text.titleLarge),
+            Text(
+              ended ? (nextQueued ? 'Next song coming up…' : 'That song ended') : 'Nothing playing yet',
+              style: context.text.titleLarge,
+            ),
             const SizedBox(height: Space.xs),
             Text(
-              canPick
+              ended
+                  ? (nextQueued
+                        ? 'Starting the next song in the queue.'
+                        : 'Nothing is up next. Add a song to keep the room going.')
+                  : canPick
                   ? (radio ? 'Pick a station to start the room.' : 'Add a song or video — everyone watches it in sync.')
                   : 'The host will pick a station soon.',
               textAlign: TextAlign.center,
               style: context.text.bodyMedium?.copyWith(color: context.synk.textSecondary),
             ),
-            if (canPick) ...[
+            if (canPick && !(ended && nextQueued)) ...[
               const SizedBox(height: Space.lg),
               PrimaryButton(
-                label: radio ? 'Pick a station' : 'Add the first song',
+                label: radio ? 'Pick a station' : (ended ? 'Add a song' : 'Add the first song'),
                 icon: radio ? Icons.radio_rounded : Icons.add_rounded,
                 expand: false,
                 height: 48,

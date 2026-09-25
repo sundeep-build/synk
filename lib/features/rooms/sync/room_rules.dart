@@ -1,3 +1,4 @@
+import '../../catalog/domain/track.dart';
 import '../domain/room_live_models.dart';
 
 /// Pure decision helpers shared by the session controller and tests.
@@ -24,6 +25,16 @@ abstract final class RoomRules {
   /// Counts votes cast for the *current* track only (stale votes are ignored).
   static int countSkipVotes(Map<String, int> votes, int currentSeq) =>
       votes.values.where((seq) => seq == currentSeq).length;
+
+  /// Autoplay's fallback when similar songs can't be fetched (no YouTube key,
+  /// daily quota used up): the song the room played longest ago, so history
+  /// plays round in a loop. [played] is most recent first.
+  static Track? replayCandidate(List<Track> played, {String? currentId}) {
+    for (final t in played.reversed) {
+      if (t.id != currentId) return t;
+    }
+    return null;
+  }
 
   /// Non-leaders wait before trying to auto-advance so the leader normally
   /// wins the transaction and nobody fetches a track for nothing.

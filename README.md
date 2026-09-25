@@ -48,7 +48,7 @@ flutter run --dart-define-from-file=env/dev.json    # or use the "Synk (dev)" VS
 
    ```bash
    firebase use <project-id>
-   firebase deploy --only firestore,database
+   firebase deploy --only firestore,database   # rules + the composite indexes Home needs
    ```
 
 7. **Google Sign-In**
@@ -83,7 +83,7 @@ firebase emulators:start --project demo-synk   # Auth, Firestore, RTDB, and the 
 | Area | Features |
 | --- | --- |
 | Onboarding | Guest mode ("just look around"), Google and Apple sign-in, a live username availability check, an emoji avatar builder, and vibe picker |
-| Rooms | Public or code-only rooms, music or radio mode, capacity limit, synced playback, host controls, an acting host when the host leaves, shareable invite deep links (`synk://app/join/CODE`) |
+| Rooms | Public or code-only rooms, music or radio mode, capacity limit, synced playback, host controls, an acting host when the host leaves, shareable invite deep links (`synk://app/join/CODE`). **Your rooms** on Home: reopen a room you host after closing the app, or end it for good |
 | In-room | Live chat, floating reactions, dedications, shared queue, vote-to-skip, autoplay of similar songs when the queue runs dry |
 | Huddle | Voice call inside a room, over the music (up to 8 people). Camera on/off (up to 4), switch camera, speaker/earpiece, mute, talking rings. Keeps going in the background (Android: "In a huddle" notification) |
 | App | Android back: other tabs go to Home first, then "Exit Synk?" (Exit leaves the room/huddle and stops playback) |

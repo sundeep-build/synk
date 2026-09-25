@@ -75,7 +75,7 @@ class _LiveRoomsScreenState extends ConsumerState<LiveRoomsScreen> {
         padding: EdgeInsets.fromLTRB(Space.gutter, Space.sm, Space.gutter, bottom),
         itemCount: 5,
         separatorBuilder: (_, _) => const SizedBox(height: Space.md),
-        itemBuilder: (_, _) => const Skeleton(height: 112, radius: Radii.lgAll),
+        itemBuilder: (_, _) => const Skeleton(height: 108, radius: Radii.xlAll),
       );
     } else {
       body = ListView.separated(
@@ -90,7 +90,10 @@ class _LiveRoomsScreenState extends ConsumerState<LiveRoomsScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Live now')),
+      appBar: AppBar(
+        leading: const CircleBackButton(),
+        title: SplitTitle('Live now', style: context.text.headlineSmall),
+      ),
       body: RefreshIndicator(onRefresh: _refresh, child: body),
     );
   }

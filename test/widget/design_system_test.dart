@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:synk/core/design_system/design_system.dart';
-import 'package:synk/features/auth/presentation/welcome_screen.dart';
 import 'package:synk/features/rooms/application/room_providers.dart';
 import 'package:synk/features/rooms/domain/room.dart';
 import 'package:synk/features/rooms/domain/room_live_models.dart';
@@ -167,5 +166,74 @@ void main() {
     expect(find.bySemanticsLabel('Synk logo'), findsOneWidget);
     final image = tester.widget<Image>(find.byType(Image));
     expect((image.image as ResizeImage).imageProvider, isA<AssetImage>());
+  });
+
+  group('on a 360dp phone at the largest text size', () {
+    setUp(() {
+      final view = TestWidgetsFlutterBinding.instance.platformDispatcher.views.first;
+      view.physicalSize = const Size(360, 800);
+      view.devicePixelRatio = 1;
+    });
+    tearDown(() => TestWidgetsFlutterBinding.instance.platformDispatcher.views.first.reset());
+
+    Widget scaled(Widget child) => ProviderScope(
+      child: MediaQuery(
+        data: const MediaQueryData(size: Size(360, 800), textScaler: TextScaler.linear(1.35)),
+        child: _host(child),
+      ),
+    );
+
+    Room room({bool isLive = true}) => Room(
+      id: 'r3',
+      name: 'Late night Punjabi drives with the whole crew',
+      code: 'ABC234',
+      hostId: 'h',
+      hostName: 'sandeep_the_host',
+      hostEmoji: '🎧',
+      hostColor: 3,
+      visibility: RoomVisibility.private,
+      mode: RoomMode.music,
+      capacity: 25,
+      isLive: isLive,
+      listenerCount: isLive ? 4 : 0,
+      lastActiveAt: DateTime.now(),
+    );
+
+    for (final (label, live, here, status) in [
+      ('paused', false, false, 'Paused · tap to open'),
+      ('live', true, false, 'Live · 4 listening'),
+      ('current', true, true, "You're in it"),
+    ]) {
+      testWidgets('MyRoomCard ($label) shows its status and fits', (tester) async {
+        var opened = 0;
+        await tester.pumpWidget(
+          scaled(
+            SizedBox(
+              height: 110,
+              child: MyRoomCard(
+                room: room(isLive: live),
+                here: here,
+                onOpen: () => opened++,
+                onShare: () {},
+                onEnd: () {},
+              ),
+            ),
+          ),
+        );
+        expect(tester.takeException(), isNull);
+        expect(find.text(status), findsOneWidget);
+        await tester.tap(find.text('Late night Punjabi drives with the whole crew'));
+        expect(opened, 1);
+      });
+    }
+
+    testWidgets('SectionHeader splits heavy/light and offers See all', (tester) async {
+      var taps = 0;
+      await tester.pumpWidget(scaled(SectionHeader('Trending videos', action: 'See all', onAction: () => taps++)));
+      expect(tester.takeException(), isNull);
+      expect(find.text('Trending videos', findRichText: true), findsOneWidget);
+      await tester.tap(find.text('See all'));
+      expect(taps, 1);
+    });
   });
 }

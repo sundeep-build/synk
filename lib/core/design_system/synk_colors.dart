@@ -59,7 +59,7 @@ class SynkColors extends ThemeExtension<SynkColors> {
     surfaceRaised: SynkPalette.ink850,
     surfaceOverlay: SynkPalette.ink800,
     glassFill: Color(0xE6111331), // 90% ink900
-    glassBorder: Color(0x1FFFFFFF), // 12% white
+    glassBorder: Color(0x17FFFFFF), // 9% white
     textPrimary: SynkPalette.ink50,
     textSecondary: SynkPalette.ink300,
     textMuted: SynkPalette.ink400,

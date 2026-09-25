@@ -11,6 +11,7 @@ import '../../auth/application/session.dart';
 import '../../catalog/domain/genres.dart';
 import '../../library/application/library_providers.dart';
 import '../../player/application/player_providers.dart';
+import '../../rooms/application/room_providers.dart';
 import '../../rooms/application/room_session_controller.dart';
 import '../domain/user_profile.dart';
 import 'avatar_picker.dart';
@@ -69,131 +70,210 @@ class ProfileScreen extends ConsumerWidget {
     final likes = ref.watch(likedIdsProvider).length;
     final playlists = ref.watch(playlistsProvider).value?.length ?? 0;
     final themeMode = ref.watch(themeModeProvider);
+    final rooms = ref.watch(myRoomsProvider).value?.length ?? 0;
     final c = context.synk;
 
     return Scaffold(
-      body: ListView(
-        padding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom + Space.xxl),
-        children: [
-          SafeArea(
-            bottom: false,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(Space.gutter, Space.xl, Space.gutter, 0),
-              child: Column(
-                children: [
-                  SynkAvatar(emoji: profile.avatarEmoji, colorIndex: profile.avatarColor, size: 104, ring: true),
-                  const SizedBox(height: Space.lg),
-                  Text(profile.displayName, style: context.text.headlineMedium),
-                  Text('@${profile.username}', style: context.text.bodyMedium?.copyWith(color: c.textSecondary)),
-                  const SizedBox(height: Space.lg),
-                  OutlinedButton.icon(
-                    onPressed: () => showModalBottomSheet<void>(
-                      context: context,
-                      useRootNavigator: true,
-                      isScrollControlled: true,
-                      builder: (_) => _EditProfileSheet(profile: profile),
-                    ),
-                    icon: const Icon(Icons.edit_rounded, size: 18),
-                    label: const Text('Edit profile'),
-                  ),
-                  const SizedBox(height: Space.xl),
-                  Row(
-                    children: [
-                      _Stat(value: '$likes', label: 'Liked'),
-                      _Stat(value: '$playlists', label: 'Playlists'),
-                      _Stat(value: '${profile.vibes.length}', label: 'Vibes'),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-          if (isGuest)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(Space.gutter, Space.xl, Space.gutter, 0),
-              child: Container(
-                padding: const EdgeInsets.all(Space.lg),
-                decoration: BoxDecoration(color: c.brand, borderRadius: Radii.lgAll),
+      body: GridBackdrop(
+        child: ListView(
+          padding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom + 160),
+          children: [
+            SafeArea(
+              bottom: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(Space.gutter, Space.xl, Space.gutter, 0),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Save your account', style: context.text.titleLarge?.copyWith(color: c.onBrand)),
-                    const SizedBox(height: Space.xs),
-                    Text(
-                      "You're a guest. Link an account to keep your likes and username on any phone.",
-                      style: context.text.bodyMedium?.copyWith(color: c.onBrand),
+                    SynkAvatar(emoji: profile.avatarEmoji, colorIndex: profile.avatarColor, size: 104, ring: true),
+                    const SizedBox(height: Space.lg),
+                    Text(profile.displayName, style: context.text.headlineMedium),
+                    Text('@${profile.username}', style: context.text.bodyMedium?.copyWith(color: c.textSecondary)),
+                    const SizedBox(height: Space.lg),
+                    PillButton(
+                      label: 'Edit profile',
+                      icon: Icons.edit_rounded,
+                      height: 38,
+                      onPressed: () => showModalBottomSheet<void>(
+                        context: context,
+                        useRootNavigator: true,
+                        isScrollControlled: true,
+                        builder: (_) => _EditProfileSheet(profile: profile),
+                      ),
                     ),
-                    const SizedBox(height: Space.md),
-                    Wrap(
-                      spacing: Space.sm,
-                      children: [
-                        FilledButton(
-                          style: FilledButton.styleFrom(
-                            backgroundColor: SynkPalette.ink950,
-                            foregroundColor: Colors.white,
-                          ),
-                          onPressed: () => _link(context, ref, apple: false),
-                          child: const Text('Link Google'),
+                    const SizedBox(height: Space.xl),
+                    _Panel(
+                      child: IntrinsicHeight(
+                        child: Row(
+                          children: [
+                            _Stat(value: '$likes', label: 'Liked'),
+                            VerticalDivider(color: c.glassBorder, width: 1),
+                            _Stat(value: '$playlists', label: 'Playlists'),
+                            VerticalDivider(color: c.glassBorder, width: 1),
+                            _Stat(value: '$rooms', label: 'Your rooms'),
+                          ],
                         ),
-                        if (Platform.isIOS)
-                          FilledButton(
-                            style: FilledButton.styleFrom(
-                              backgroundColor: Colors.white,
-                              foregroundColor: SynkPalette.ink950,
-                            ),
-                            onPressed: () => _link(context, ref, apple: true),
-                            child: const Text('Link Apple'),
-                          ),
-                      ],
+                      ),
                     ),
                   ],
                 ),
               ),
             ),
-          const SectionHeader('Settings'),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: Space.gutter),
-            child: SegmentedButton<ThemeMode>(
-              segments: const [
-                ButtonSegment(value: ThemeMode.dark, icon: Icon(Icons.dark_mode_rounded), label: Text('Dark')),
-                ButtonSegment(value: ThemeMode.light, icon: Icon(Icons.light_mode_rounded), label: Text('Light')),
-                ButtonSegment(value: ThemeMode.system, icon: Icon(Icons.phone_iphone_rounded), label: Text('Auto')),
-              ],
-              selected: {themeMode},
-              onSelectionChanged: (s) => ref.read(themeModeProvider.notifier).set(s.first),
+            if (isGuest)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(Space.gutter, Space.xl, Space.gutter, 0),
+                child: Container(
+                  padding: const EdgeInsets.all(Space.lg),
+                  decoration: BoxDecoration(color: c.brand, borderRadius: Radii.xlAll),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Save your account', style: context.text.titleLarge?.copyWith(color: c.onBrand)),
+                      const SizedBox(height: Space.xs),
+                      Text(
+                        "You're a guest. Link an account to keep your likes and username on any phone.",
+                        style: context.text.bodyMedium?.copyWith(color: c.onBrand),
+                      ),
+                      const SizedBox(height: Space.md),
+                      Wrap(
+                        spacing: Space.sm,
+                        children: [
+                          FilledButton(
+                            style: FilledButton.styleFrom(
+                              backgroundColor: SynkPalette.ink950,
+                              foregroundColor: Colors.white,
+                            ),
+                            onPressed: () => _link(context, ref, apple: false),
+                            child: const Text('Link Google'),
+                          ),
+                          if (Platform.isIOS)
+                            FilledButton(
+                              style: FilledButton.styleFrom(
+                                backgroundColor: Colors.white,
+                                foregroundColor: SynkPalette.ink950,
+                              ),
+                              onPressed: () => _link(context, ref, apple: true),
+                              child: const Text('Link Apple'),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            SectionHeader('Settings', accent: c.brand),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: Space.gutter),
+              child: SegmentedButton<ThemeMode>(
+                segments: const [
+                  ButtonSegment(value: ThemeMode.dark, icon: Icon(Icons.dark_mode_rounded), label: Text('Dark')),
+                  ButtonSegment(value: ThemeMode.light, icon: Icon(Icons.light_mode_rounded), label: Text('Light')),
+                  ButtonSegment(value: ThemeMode.system, icon: Icon(Icons.phone_iphone_rounded), label: Text('Auto')),
+                ],
+                selected: {themeMode},
+                onSelectionChanged: (s) => ref.read(themeModeProvider.notifier).set(s.first),
+              ),
             ),
-          ),
-          const SizedBox(height: Space.md),
-          ListTile(
-            leading: const Icon(Icons.privacy_tip_outlined),
-            title: const Text('Privacy policy'),
-            onTap: () => launchUrl(Uri.parse(AppConfig.privacyUrl)),
-          ),
-          ListTile(
-            leading: const Icon(Icons.description_outlined),
-            title: const Text('Terms of use'),
-            onTap: () => launchUrl(Uri.parse(AppConfig.termsUrl)),
-          ),
-          ListTile(
-            leading: const Icon(Icons.logout_rounded),
-            title: const Text('Sign out'),
-            subtitle: isGuest ? const Text('Guest data is lost when you sign out') : null,
-            onTap: () => _signOut(ref),
-          ),
-          ListTile(
-            leading: const Icon(Icons.delete_forever_rounded, color: SynkPalette.danger),
-            title: const Text('Delete account', style: TextStyle(color: SynkPalette.danger)),
-            onTap: () => _deleteAccount(context, ref, profile),
-          ),
-          const SizedBox(height: Space.lg),
-          Center(
-            child: Text(
-              '${AppConfig.appName} · ${AppConfig.flavor.name}',
-              style: context.text.bodySmall?.copyWith(color: c.textMuted),
+            const SizedBox(height: Space.lg),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: Space.gutter),
+              child: _Panel(
+                padding: const EdgeInsets.symmetric(vertical: Space.xs),
+                child: Column(
+                  children: [
+                    _SettingsRow(
+                      icon: Icons.privacy_tip_outlined,
+                      title: 'Privacy policy',
+                      onTap: () => launchUrl(Uri.parse(AppConfig.privacyUrl)),
+                    ),
+                    _SettingsRow(
+                      icon: Icons.description_outlined,
+                      title: 'Terms of use',
+                      onTap: () => launchUrl(Uri.parse(AppConfig.termsUrl)),
+                    ),
+                    _SettingsRow(
+                      icon: Icons.logout_rounded,
+                      title: 'Sign out',
+                      subtitle: isGuest ? 'Guest data is lost when you sign out' : null,
+                      onTap: () => _signOut(ref),
+                    ),
+                    _SettingsRow(
+                      icon: Icons.delete_forever_rounded,
+                      title: 'Delete account',
+                      danger: true,
+                      onTap: () => _deleteAccount(context, ref, profile),
+                    ),
+                  ],
+                ),
+              ),
             ),
-          ),
-        ],
+            const SizedBox(height: Space.lg),
+            Center(
+              child: Text(
+                '${AppConfig.appName} · ${AppConfig.flavor.name}',
+                style: context.text.bodySmall?.copyWith(color: c.textMuted),
+              ),
+            ),
+          ],
+        ),
       ),
+    );
+  }
+}
+
+/// Rounded surface for grouped content.
+class _Panel extends StatelessWidget {
+  const _Panel({required this.child, this.padding = const EdgeInsets.symmetric(vertical: Space.lg)});
+
+  final Widget child;
+  final EdgeInsets padding;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: double.infinity,
+    padding: padding,
+    decoration: BoxDecoration(
+      color: context.synk.surface,
+      borderRadius: Radii.xlAll,
+      border: Border.all(color: context.synk.glassBorder),
+    ),
+    child: child,
+  );
+}
+
+class _SettingsRow extends StatelessWidget {
+  const _SettingsRow({
+    required this.icon,
+    required this.title,
+    required this.onTap,
+    this.subtitle,
+    this.danger = false,
+  });
+
+  final IconData icon;
+  final String title;
+  final String? subtitle;
+  final VoidCallback onTap;
+  final bool danger;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.synk;
+    final color = danger ? SynkPalette.danger : c.textPrimary;
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: Space.lg),
+      leading: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: danger ? SynkPalette.danger.withValues(alpha: 0.14) : c.surfaceOverlay,
+          shape: BoxShape.circle,
+        ),
+        child: Icon(icon, size: 18, color: danger ? SynkPalette.danger : c.textSecondary),
+      ),
+      title: Text(title, style: context.text.titleMedium?.copyWith(color: color)),
+      subtitle: subtitle == null ? null : Text(subtitle!),
+      trailing: Icon(Icons.chevron_right_rounded, color: c.textMuted),
+      onTap: onTap,
     );
   }
 }

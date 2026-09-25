@@ -3,14 +3,16 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'synk_colors.dart';
+import 'synk_type.dart';
 import 'tokens.dart';
 
 /// Builds light/dark [ThemeData] from the tokens.
 ///
-/// Typography: Bricolage Grotesque (display — characterful, music-poster
-/// energy) over Plus Jakarta Sans (body — clean and very legible at small
-/// sizes). Fonts are fetched once and cached; bundle them under
-/// `assets/google_fonts/` for fully offline first launch.
+/// Typography: Montserrat throughout — geometric and bold for headings
+/// (section titles pair a heavy first word with a light second one, see
+/// SectionHeader), and still very legible at small sizes. Fetched once and
+/// cached; bundle it under `assets/google_fonts/` for a fully offline first
+/// launch.
 abstract final class AppTheme {
   static ThemeData dark() => _build(Brightness.dark, SynkColors.dark);
   static ThemeData light() => _build(Brightness.light, SynkColors.light);
@@ -64,7 +66,14 @@ abstract final class AppTheme {
       scaffoldBackgroundColor: c.background,
       canvasColor: c.background,
       textTheme: text,
-      extensions: [c],
+      extensions: [
+        c,
+        // Every weight the UI switches between, registered (and fetched) up front.
+        SynkType({
+          for (final w in const [FontWeight.w400, FontWeight.w500, FontWeight.w600, FontWeight.w700, FontWeight.w800])
+            w: GoogleFonts.montserrat(fontWeight: w).fontFamily!,
+        }),
+      ],
       splashFactory: InkSparkle.splashFactory,
       visualDensity: VisualDensity.standard,
       materialTapTargetSize: MaterialTapTargetSize.padded,
@@ -75,7 +84,11 @@ abstract final class AppTheme {
         },
       ),
       appBarTheme: AppBarTheme(
-        backgroundColor: Colors.transparent,
+        // Clear over the page, solid once content scrolls beneath (pinned
+        // bars would otherwise show the list through the title).
+        backgroundColor: WidgetStateColor.resolveWith(
+          (states) => states.contains(WidgetState.scrolledUnder) ? c.background : Colors.transparent,
+        ),
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         scrolledUnderElevation: 0,
@@ -83,23 +96,30 @@ abstract final class AppTheme {
         titleTextStyle: text.titleLarge,
         systemOverlayStyle: isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
       ),
+      // Outlined pill fields.
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: c.surfaceRaised,
-        hintStyle: text.bodyLarge?.copyWith(color: c.textMuted),
-        contentPadding: const EdgeInsets.symmetric(horizontal: Space.lg, vertical: Space.lg),
-        border: const OutlineInputBorder(borderRadius: Radii.mdAll, borderSide: BorderSide.none),
+        fillColor: c.surface,
+        hintStyle: text.bodyMedium?.copyWith(color: c.textMuted),
+        prefixIconColor: c.textSecondary,
+        suffixIconColor: c.textSecondary,
+        contentPadding: const EdgeInsets.symmetric(horizontal: Space.xl, vertical: Space.lg),
+        border: const OutlineInputBorder(borderRadius: Radii.xlAll, borderSide: BorderSide.none),
         enabledBorder: OutlineInputBorder(
-          borderRadius: Radii.mdAll,
+          borderRadius: Radii.xlAll,
           borderSide: BorderSide(color: c.glassBorder),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: Radii.mdAll,
+          borderRadius: Radii.xlAll,
           borderSide: BorderSide(color: scheme.primary, width: 1.5),
         ),
         errorBorder: const OutlineInputBorder(
-          borderRadius: Radii.mdAll,
+          borderRadius: Radii.xlAll,
           borderSide: BorderSide(color: SynkPalette.danger),
+        ),
+        focusedErrorBorder: const OutlineInputBorder(
+          borderRadius: Radii.xlAll,
+          borderSide: BorderSide(color: SynkPalette.danger, width: 1.5),
         ),
       ),
       filledButtonTheme: FilledButtonThemeData(
@@ -121,12 +141,15 @@ abstract final class AppTheme {
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(textStyle: text.labelLarge, shape: const StadiumBorder()),
       ),
+      // Soft-cornered tags; the selected one turns solid pink.
       chipTheme: ChipThemeData(
-        shape: const StadiumBorder(),
+        shape: const RoundedRectangleBorder(borderRadius: Radii.smAll),
         side: BorderSide(color: c.glassBorder),
         backgroundColor: c.surfaceRaised,
-        selectedColor: scheme.primaryContainer,
-        labelStyle: text.labelMedium,
+        selectedColor: SynkPalette.pinkDeep,
+        labelStyle: text.labelMedium?.copyWith(color: c.textPrimary),
+        secondaryLabelStyle: text.labelMedium?.copyWith(color: Colors.white),
+        iconTheme: IconThemeData(color: c.textSecondary, size: 16),
         padding: const EdgeInsets.symmetric(horizontal: Space.md, vertical: Space.sm),
         showCheckmark: false,
       ),
@@ -150,7 +173,7 @@ abstract final class AppTheme {
       ),
       sliderTheme: SliderThemeData(
         trackHeight: 4,
-        activeTrackColor: c.textPrimary,
+        activeTrackColor: scheme.tertiary,
         inactiveTrackColor: c.glassBorder,
         thumbColor: c.textPrimary,
         overlayShape: SliderComponentShape.noOverlay,
@@ -159,11 +182,11 @@ abstract final class AppTheme {
       tabBarTheme: TabBarThemeData(
         dividerColor: Colors.transparent,
         indicatorSize: TabBarIndicatorSize.tab,
-        labelColor: isDark ? SynkPalette.ink950 : Colors.white,
+        labelColor: c.onBrand,
         unselectedLabelColor: c.textSecondary,
         labelStyle: text.labelLarge,
         unselectedLabelStyle: text.labelLarge,
-        indicator: BoxDecoration(color: isDark ? SynkPalette.ink50 : SynkPalette.ink950, borderRadius: Radii.pillAll),
+        indicator: BoxDecoration(color: c.brand, borderRadius: Radii.pillAll),
         splashFactory: NoSplash.splashFactory,
         overlayColor: const WidgetStatePropertyAll(Colors.transparent),
       ),
@@ -179,32 +202,32 @@ abstract final class AppTheme {
   }
 
   static TextTheme _textTheme(SynkColors c) {
-    TextStyle display(double size, FontWeight weight, double tracking) => GoogleFonts.bricolageGrotesque(
+    TextStyle display(double size, FontWeight weight, double tracking) => GoogleFonts.montserrat(
       fontSize: size,
       fontWeight: weight,
       letterSpacing: tracking,
-      height: 1.1,
+      height: 1.12,
       color: c.textPrimary,
     );
     TextStyle body(double size, FontWeight weight, {double height = 1.4, Color? color}) =>
-        GoogleFonts.plusJakartaSans(fontSize: size, fontWeight: weight, height: height, color: color ?? c.textPrimary);
+        GoogleFonts.montserrat(fontSize: size, fontWeight: weight, height: height, color: color ?? c.textPrimary);
 
     return TextTheme(
-      displayLarge: display(48, FontWeight.w800, -1.6),
-      displayMedium: display(40, FontWeight.w800, -1.2),
-      displaySmall: display(32, FontWeight.w700, -0.8),
-      headlineLarge: display(28, FontWeight.w700, -0.6),
-      headlineMedium: display(24, FontWeight.w700, -0.4),
-      headlineSmall: display(20, FontWeight.w700, -0.2),
-      titleLarge: display(20, FontWeight.w700, -0.2),
-      titleMedium: body(15, FontWeight.w700, height: 1.3),
-      titleSmall: body(13, FontWeight.w700, height: 1.3),
-      bodyLarge: body(16, FontWeight.w500),
-      bodyMedium: body(14, FontWeight.w500),
-      bodySmall: body(12, FontWeight.w500, color: c.textSecondary),
-      labelLarge: body(15, FontWeight.w700, height: 1.2),
-      labelMedium: body(13, FontWeight.w600, height: 1.2),
-      labelSmall: body(11, FontWeight.w700, height: 1.2),
+      displayLarge: display(44, FontWeight.w800, -1.2),
+      displayMedium: display(38, FontWeight.w800, -1),
+      displaySmall: display(30, FontWeight.w800, -0.6),
+      headlineLarge: display(26, FontWeight.w800, -0.4),
+      headlineMedium: display(22, FontWeight.w700, -0.3),
+      headlineSmall: display(19, FontWeight.w700, -0.2),
+      titleLarge: display(18, FontWeight.w700, -0.2),
+      titleMedium: body(14, FontWeight.w600, height: 1.3),
+      titleSmall: body(13, FontWeight.w600, height: 1.3),
+      bodyLarge: body(15, FontWeight.w500),
+      bodyMedium: body(13, FontWeight.w500),
+      bodySmall: body(11.5, FontWeight.w500, color: c.textSecondary),
+      labelLarge: body(14, FontWeight.w600, height: 1.2),
+      labelMedium: body(12, FontWeight.w600, height: 1.2),
+      labelSmall: body(10.5, FontWeight.w600, height: 1.2),
     );
   }
 }

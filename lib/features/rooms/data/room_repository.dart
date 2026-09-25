@@ -140,15 +140,21 @@ class RoomRepository {
   /// out of Live now once everyone has left (or the app was closed), so this
   /// is how its host finds it again.
   Future<List<Room>> hostedBy(String uid, {int limit = 10}) async {
-    final snap = await _rooms
-        .where('hostId', isEqualTo: uid)
-        .orderBy('createdAt', descending: true)
-        .limit(limit)
-        .get();
-    return [
-      for (final d in snap.docs)
+    final byHost = _rooms.where('hostId', isEqualTo: uid);
+    List<Room> open(Iterable<QueryDocumentSnapshot<Map<String, dynamic>>> docs) => [
+      for (final d in docs)
         if (Room.fromJson(d.id, d.data()) case final r when !r.closed) r,
     ];
+    try {
+      return open((await byHost.orderBy('createdAt', descending: true).limit(limit).get()).docs);
+    } on FirebaseException catch (e) {
+      // The composite index isn't built yet (just deployed, or not at all):
+      // same rooms, sorted here instead.
+      if (e.code != 'failed-precondition') rethrow;
+      final rooms = open((await byHost.limit(limit * 3).get()).docs)
+        ..sort((a, b) => (b.createdAt ?? DateTime(0)).compareTo(a.createdAt ?? DateTime(0)));
+      return rooms.take(limit).toList();
+    }
   }
 
   /// Directory refresh written by the room leader (see RoomRules.leader).

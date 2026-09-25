@@ -4,6 +4,7 @@ import 'package:synk/features/rooms/application/room_session.dart';
 import 'package:synk/features/rooms/domain/room.dart';
 import 'package:synk/features/rooms/domain/room_live_models.dart';
 import 'package:synk/features/rooms/domain/room_playback.dart';
+import 'package:synk/features/rooms/sync/room_rules.dart';
 
 Track _t(String id) => Track(
   id: 'yt:$id',
@@ -97,5 +98,34 @@ void main() {
     // Autoplay pick (no queue entry) clears it.
     s = s.withPlayback(_playing(c, 3), const {});
     expect(s.playingItem, isNull);
+  });
+
+  test('"song ended" clears as soon as the room moves on', () {
+    var s = const RoomSession(room: _room, myUid: 'u1').withPlayback(_playing(a, 1), const {});
+    s = s.copyWith(songEnded: true);
+    expect(s.withPlayback(_playing(b, 2), const {}).songEnded, isFalse, reason: 'next song');
+    expect(
+      s
+          .withPlayback(
+            RoomPlayback(track: a, status: PlaybackStatus.playing, positionMs: 0, updatedAt: 9, seq: 1),
+            const {},
+          )
+          .songEnded,
+      isFalse,
+      reason: 'host restarted it',
+    );
+  });
+
+  group('autoplay replay fallback (no YouTube key / quota used up)', () {
+    test('plays what the room played longest ago, never the song that just ended', () {
+      // Most recent first.
+      expect(RoomRules.replayCandidate([c, b, a], currentId: c.id)?.id, a.id);
+      expect(RoomRules.replayCandidate([c, b, a], currentId: a.id)?.id, b.id);
+    });
+
+    test('nothing to replay → null (the room waits for a queued song)', () {
+      expect(RoomRules.replayCandidate(const []), isNull);
+      expect(RoomRules.replayCandidate([a], currentId: a.id), isNull);
+    });
   });
 }

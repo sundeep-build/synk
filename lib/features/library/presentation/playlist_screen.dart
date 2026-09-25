@@ -84,10 +84,11 @@ class _PlaylistBody extends ConsumerWidget {
         slivers: [
           SliverAppBar(
             pinned: true,
-            backgroundColor: Colors.transparent,
+            leading: const CircleBackButton(),
             actions: [
               PopupMenuButton<String>(
                 tooltip: 'Playlist options',
+                icon: const Icon(Icons.more_vert_rounded),
                 onSelected: (v) => _menu(context, ref, v),
                 itemBuilder: (_) => const [
                   PopupMenuItem(value: 'rename', child: Text('Rename')),
@@ -101,12 +102,24 @@ class _PlaylistBody extends ConsumerWidget {
               padding: const EdgeInsets.symmetric(horizontal: Space.gutter),
               child: Column(
                 children: [
-                  Artwork(
-                    url: playlist.coverUrl,
-                    size: cover,
-                    radius: Radii.xlAll,
-                    seed: playlist.id.hashCode,
-                    icon: Icons.queue_music_rounded,
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      borderRadius: Radii.xlAll,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.45),
+                          blurRadius: 40,
+                          offset: const Offset(0, 16),
+                        ),
+                      ],
+                    ),
+                    child: Artwork(
+                      url: playlist.coverUrl,
+                      size: cover,
+                      radius: Radii.xlAll,
+                      seed: playlist.id.hashCode,
+                      icon: Icons.queue_music_rounded,
+                    ),
                   ),
                   const SizedBox(height: Space.xl),
                   Text(playlist.name, textAlign: TextAlign.center, style: context.text.headlineLarge),
@@ -152,7 +165,9 @@ class _PlaylistBody extends ConsumerWidget {
               ),
             )
           else
-            SliverList.builder(
+            // Fixed row height: long playlists lay out in constant time.
+            SliverPrototypeExtentList.builder(
+              prototypeItem: TrackTile.prototype,
               itemCount: tracks.length,
               itemBuilder: (_, i) {
                 final t = tracks[i];
@@ -162,7 +177,8 @@ class _PlaylistBody extends ConsumerWidget {
                   background: Container(
                     alignment: Alignment.centerRight,
                     padding: const EdgeInsets.only(right: Space.xl),
-                    color: SynkPalette.danger,
+                    margin: const EdgeInsets.symmetric(horizontal: Space.gutter - Space.sm, vertical: 2),
+                    decoration: const BoxDecoration(color: SynkPalette.danger, borderRadius: Radii.lgAll),
                     child: const Icon(Icons.delete_outline_rounded, color: Colors.white),
                   ),
                   onDismissed: (_) =>
@@ -173,7 +189,7 @@ class _PlaylistBody extends ConsumerWidget {
                 );
               },
             ),
-          SliverToBoxAdapter(child: SizedBox(height: MediaQuery.paddingOf(context).bottom + Space.xxl)),
+          SliverToBoxAdapter(child: SizedBox(height: MediaQuery.paddingOf(context).bottom + 160)),
         ],
       ),
     );

@@ -131,14 +131,11 @@ class _DedicationCard extends StatelessWidget {
                 TextSpan(
                   children: [
                     const TextSpan(text: '🎁 '),
-                    TextSpan(
-                      text: message.name,
-                      style: const TextStyle(fontWeight: FontWeight.w800),
-                    ),
+                    TextSpan(text: message.name, style: context.weight(context.text.bodyMedium, FontWeight.w800)),
                     const TextSpan(text: ' dedicated a song to '),
                     TextSpan(
                       text: message.toName ?? 'the room',
-                      style: const TextStyle(fontWeight: FontWeight.w800),
+                      style: context.weight(context.text.bodyMedium, FontWeight.w800),
                     ),
                   ],
                 ),

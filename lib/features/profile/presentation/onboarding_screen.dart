@@ -108,64 +108,76 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         if (!didPop && _step > 0) _goTo(_step - 1);
       },
       child: Scaffold(
-        body: SafeArea(
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(Space.sm, Space.sm, Space.gutter, 0),
-                child: Row(
-                  children: [
-                    IconButton(
-                      tooltip: 'Back',
-                      onPressed: _step == 0 ? null : () => _goTo(_step - 1),
-                      icon: const Icon(Icons.arrow_back_rounded),
-                    ),
-                    const SizedBox(width: Space.sm),
-                    for (var i = 0; i < 3; i++)
-                      Expanded(
-                        child: AnimatedContainer(
-                          duration: Motion.medium,
-                          margin: const EdgeInsets.symmetric(horizontal: 3),
-                          height: 4,
-                          decoration: BoxDecoration(
-                            borderRadius: Radii.pillAll,
-                            color: i <= _step ? context.colors.primary : context.synk.glassBorder,
-                          ),
+        body: GridBackdrop(
+          child: SafeArea(
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(Space.sm, Space.sm, Space.gutter, 0),
+                  child: Row(
+                    children: [
+                      AnimatedOpacity(
+                        duration: Motion.fast,
+                        opacity: _step == 0 ? 0.35 : 1,
+                        child: CircleIconButton(
+                          icon: Icons.arrow_back_rounded,
+                          tooltip: 'Back',
+                          size: 42,
+                          onPressed: _step == 0 ? null : () => _goTo(_step - 1),
                         ),
                       ),
-                  ],
+                      const SizedBox(width: Space.sm),
+                      for (var i = 0; i < 3; i++)
+                        Expanded(
+                          child: AnimatedContainer(
+                            duration: Motion.medium,
+                            margin: const EdgeInsets.symmetric(horizontal: 3),
+                            height: 4,
+                            decoration: BoxDecoration(
+                              borderRadius: Radii.pillAll,
+                              color: i <= _step ? context.synk.brand : context.synk.glassBorder,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
-              ),
-              Expanded(
-                child: PageView(
-                  controller: _pages,
-                  physics: const NeverScrollableScrollPhysics(),
-                  children: [_nameStep(), _avatarStep(), _vibesStep()],
+                Expanded(
+                  child: PageView(
+                    controller: _pages,
+                    physics: const NeverScrollableScrollPhysics(),
+                    children: [_nameStep(), _avatarStep(), _vibesStep()],
+                  ),
                 ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(Space.gutter, 0, Space.gutter, Space.lg),
-                child: PrimaryButton(
-                  label: _step < 2 ? 'Continue' : "Let's go",
-                  loading: _saving,
-                  onPressed: _canContinue ? (_step < 2 ? () => _goTo(_step + 1) : _finish) : null,
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(Space.gutter, 0, Space.gutter, Space.lg),
+                  child: PrimaryButton(
+                    label: _step < 2 ? 'Continue' : "Let's go",
+                    loading: _saving,
+                    onPressed: _canContinue ? (_step < 2 ? () => _goTo(_step + 1) : _finish) : null,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _stepScaffold({required String title, required String subtitle, required Widget child}) {
+  Widget _stepScaffold({required int index, required String title, required String subtitle, required Widget child}) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(Space.gutter),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(height: Space.lg),
-          Text(title, style: context.text.displaySmall),
+          Text(
+            'STEP ${index + 1} OF 3',
+            style: context.text.labelSmall?.copyWith(letterSpacing: 2, color: context.colors.primary),
+          ),
+          const SizedBox(height: Space.sm),
+          SplitTitle(title, style: context.text.displaySmall, maxLines: 2),
           const SizedBox(height: Space.sm),
           Text(subtitle, style: context.text.bodyLarge?.copyWith(color: context.synk.textSecondary)),
           const SizedBox(height: Space.xxl),
@@ -191,6 +203,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       _ => (null, null),
     };
     return _stepScaffold(
+      index: 0,
       title: 'Pick a username',
       subtitle: 'This is how people see you in rooms.',
       child: TextField(
@@ -219,6 +232,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   }
 
   Widget _avatarStep() => _stepScaffold(
+    index: 1,
     title: 'Choose your look',
     subtitle: 'Your avatar shows up in chat and on rooms you host.',
     child: AvatarPicker(
@@ -232,6 +246,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   );
 
   Widget _vibesStep() => _stepScaffold(
+    index: 2,
     title: "What's your vibe?",
     subtitle: 'Pick a few — we use them to suggest rooms and music.',
     child: Wrap(

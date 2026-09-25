@@ -18,35 +18,37 @@ class LibraryScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
+    return const DefaultTabController(
       length: 3,
       child: Scaffold(
-        body: SafeArea(
-          bottom: false,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(Space.gutter, Space.lg, Space.gutter, Space.lg),
-                child: Text('Your library', style: context.text.headlineLarge),
-              ),
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: Space.gutter),
-                child: GlassPanel(
-                  radius: Radii.pillAll,
-                  padding: EdgeInsets.all(4),
-                  child: TabBar(
-                    tabs: [
-                      Tab(height: 36, text: 'Playlists'),
-                      Tab(height: 36, text: 'Liked'),
-                      Tab(height: 36, text: 'Recent'),
-                    ],
+        body: GridBackdrop(
+          child: SafeArea(
+            bottom: false,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: EdgeInsets.fromLTRB(Space.gutter, Space.lg, Space.gutter, Space.lg),
+                  child: SplitTitle('Your library'),
+                ),
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: Space.gutter),
+                  child: GlassPanel(
+                    radius: Radii.pillAll,
+                    padding: EdgeInsets.all(4),
+                    child: TabBar(
+                      tabs: [
+                        Tab(height: 36, text: 'Playlists'),
+                        Tab(height: 36, text: 'Liked'),
+                        Tab(height: 36, text: 'Recent'),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: Space.sm),
-              const Expanded(child: TabBarView(children: [_PlaylistsTab(), _LikedTab(), _RecentTab()])),
-            ],
+                SizedBox(height: Space.sm),
+                Expanded(child: TabBarView(children: [_PlaylistsTab(), _LikedTab(), _RecentTab()])),
+              ],
+            ),
           ),
         ),
       ),
@@ -85,7 +87,7 @@ class _PlaylistsTab extends ConsumerWidget {
             Space.gutter,
             Space.md,
             Space.gutter,
-            MediaQuery.paddingOf(context).bottom + Space.xxl,
+            MediaQuery.paddingOf(context).bottom + 160,
           ),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: columns,
@@ -107,11 +109,18 @@ class _PlaylistsTab extends ConsumerWidget {
                         width: c.maxWidth,
                         height: c.maxWidth,
                         decoration: BoxDecoration(
-                          borderRadius: Radii.lgAll,
-                          border: Border.all(color: context.colors.primary, width: 1.5),
-                          color: context.colors.primaryContainer.withValues(alpha: 0.3),
+                          borderRadius: Radii.xlAll,
+                          border: Border.all(color: context.synk.glassBorder),
+                          color: context.synk.surface,
                         ),
-                        child: Icon(Icons.add_rounded, size: 48, color: context.colors.primary),
+                        child: Center(
+                          child: Container(
+                            width: 56,
+                            height: 56,
+                            decoration: BoxDecoration(color: context.synk.brand, shape: BoxShape.circle),
+                            child: Icon(Icons.add_rounded, size: 30, color: context.synk.onBrand),
+                          ),
+                        ),
                       ),
                       const SizedBox(height: Space.sm),
                       Text('New playlist', style: context.text.titleMedium),
@@ -131,7 +140,7 @@ class _PlaylistsTab extends ConsumerWidget {
                     Artwork(
                       url: p.coverUrl,
                       size: c.maxWidth,
-                      radius: Radii.lgAll,
+                      radius: Radii.xlAll,
                       seed: p.id.hashCode,
                       icon: Icons.queue_music_rounded,
                     ),
@@ -189,10 +198,10 @@ class _TrackList extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     if (tracks.isEmpty) return Center(child: empty);
-    return ListView.builder(
-      padding: EdgeInsets.only(top: Space.sm, bottom: MediaQuery.paddingOf(context).bottom + Space.xxl),
-      itemCount: tracks.length,
-      itemBuilder: (_, i) => TrackTile(track: tracks[i], onTap: () => playTrackFromList(context, ref, tracks, i)),
+    return TrackListView(
+      tracks: tracks,
+      onTap: (i) => playTrackFromList(context, ref, tracks, i),
+      padding: EdgeInsets.only(top: Space.sm, bottom: MediaQuery.paddingOf(context).bottom + 160),
     );
   }
 }

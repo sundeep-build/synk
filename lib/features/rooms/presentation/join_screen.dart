@@ -38,7 +38,13 @@ class _JoinScreenState extends ConsumerState<JoinScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(leading: CloseButton(onPressed: () => context.go(Routes.home))),
+      appBar: AppBar(
+        leading: CircleBackButton(
+          icon: Icons.close_rounded,
+          tooltip: 'Close',
+          onPressed: () => context.go(Routes.home),
+        ),
+      ),
       body: Center(
         child: _error == null ? const CircularProgressIndicator() : ErrorState(error: _error!, onRetry: _resolve),
       ),

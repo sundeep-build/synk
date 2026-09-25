@@ -7,8 +7,9 @@ import '../../features/player/presentation/mini_player.dart';
 import '../../features/rooms/presentation/room_sheets.dart';
 import 'exit_guard.dart';
 
-/// Tab scaffold: content scrolls under a single floating glass "dock" that
-/// holds the mini player and the nav bar (one blur layer for both).
+/// Tab scaffold: content scrolls under one floating "dock" that holds the mini
+/// player and the nav bar. The dock is a solid panel, not a live blur: a
+/// backdrop blur re-renders on every frame of scrolling beneath it.
 class HomeShell extends StatelessWidget {
   const HomeShell({required this.shell, super.key});
 
@@ -37,7 +38,7 @@ class HomeShell extends StatelessWidget {
         bottomNavigationBar: SafeArea(
           minimum: const EdgeInsets.fromLTRB(Space.md, 0, Space.md, Space.sm),
           child: GlassPanel(
-            blur: true,
+            color: context.synk.surface,
             radius: Radii.xlAll,
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -71,6 +72,7 @@ class _NavRow extends StatelessWidget {
     Widget item(int i) {
       final (icon, activeIcon, label) = _items[i];
       final selected = i == current;
+      final color = selected ? context.synk.textPrimary : context.synk.textMuted;
       return Expanded(
         child: Semantics(
           selected: selected,
@@ -82,26 +84,16 @@ class _NavRow extends StatelessWidget {
             onTap: () => onTap(i),
             radius: 32,
             child: SizedBox(
-              height: 56,
+              height: 64,
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   AnimatedSwitcher(
                     duration: Motion.fast,
-                    child: Icon(
-                      selected ? activeIcon : icon,
-                      key: ValueKey(selected),
-                      color: selected ? context.synk.textPrimary : context.synk.textMuted,
-                    ),
+                    child: Icon(selected ? activeIcon : icon, key: ValueKey(selected), color: color, size: 24),
                   ),
-                  const SizedBox(height: 2),
-                  AnimatedDefaultTextStyle(
-                    duration: Motion.fast,
-                    style: context.text.labelSmall!.copyWith(
-                      color: selected ? context.synk.textPrimary : context.synk.textMuted,
-                    ),
-                    child: Text(label),
-                  ),
+                  const SizedBox(height: 3),
+                  Text(label, style: context.text.labelSmall!.copyWith(color: color)),
                 ],
               ),
             ),
@@ -117,11 +109,13 @@ class _NavRow extends StatelessWidget {
   }
 }
 
+/// The dock's centrepiece: a raised brand disc that starts a room.
 class _GoLiveButton extends StatelessWidget {
   const _GoLiveButton();
 
   @override
   Widget build(BuildContext context) {
+    final c = context.synk;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: Space.sm),
       child: Tooltip(
@@ -130,10 +124,17 @@ class _GoLiveButton extends StatelessWidget {
           onTap: () => showCreateRoomSheet(context),
           semanticLabel: 'Start a room',
           child: Container(
-            width: 52,
-            height: 40,
-            decoration: BoxDecoration(color: context.synk.brand, borderRadius: Radii.mdAll),
-            child: Icon(Icons.add_rounded, color: context.synk.onBrand, size: 28),
+            width: 54,
+            height: 54,
+            decoration: BoxDecoration(
+              color: c.brand,
+              shape: BoxShape.circle,
+              border: Border.all(color: c.background, width: 3),
+              boxShadow: [
+                BoxShadow(color: c.brand.withValues(alpha: 0.45), blurRadius: 18, offset: const Offset(0, 6)),
+              ],
+            ),
+            child: Icon(Icons.add_rounded, color: c.onBrand, size: 28),
           ),
         ),
       ),

@@ -51,92 +51,95 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   @override
   Widget build(BuildContext context) {
     final store = ref.watch(localStoreProvider);
-    final bottomInset = MediaQuery.paddingOf(context).bottom + Space.xxl;
+    // Clears the floating dock.
+    final bottomInset = MediaQuery.paddingOf(context).bottom + 160;
 
     return Scaffold(
-      body: SafeArea(
-        bottom: false,
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(Space.gutter, Space.lg, Space.gutter, Space.md),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // "Room code" lives beside the title so the filter row below never
-                  // has to share its width (it overflowed on 360dp phones).
-                  Row(
-                    children: [
-                      Expanded(child: Text('Search', style: context.text.headlineLarge)),
-                      TextButton.icon(
-                        onPressed: () => showJoinRoomSheet(context),
-                        icon: const Icon(Icons.pin_rounded, size: 18),
-                        label: const Text('Room code'),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: Space.lg),
-                  TextField(
-                    controller: _controller,
-                    textInputAction: TextInputAction.search,
-                    onChanged: _setQuery,
-                    onSubmitted: (v) => _setQuery(v, immediate: true),
-                    onTapOutside: (_) => FocusScope.of(context).unfocus(),
-                    decoration: InputDecoration(
-                      prefixIcon: const Icon(Icons.search_rounded),
-                      hintText: _radio ? 'Stations, cities, genres' : 'Songs, artists, videos — then search',
-                      suffixIcon: _controller.text.isEmpty
-                          ? null
-                          : IconButton(
-                              tooltip: 'Clear',
-                              icon: const Icon(Icons.close_rounded),
-                              onPressed: () {
-                                _controller.clear();
-                                _setQuery('', immediate: true);
-                              },
-                            ),
+      body: GridBackdrop(
+        child: SafeArea(
+          bottom: false,
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(Space.gutter, Space.lg, Space.gutter, Space.md),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // "Room code" lives beside the title so the filter row below never
+                    // has to share its width (it overflowed on 360dp phones).
+                    Row(
+                      children: [
+                        const Expanded(child: SplitTitle('Search music')),
+                        PillButton(
+                          label: 'Room code',
+                          icon: Icons.pin_rounded,
+                          onPressed: () => showJoinRoomSheet(context),
+                        ),
+                      ],
                     ),
-                  ),
-                  const SizedBox(height: Space.md),
-                  Row(
-                    children: [
-                      ChoiceChip(
-                        avatar: const Icon(Icons.smart_display_rounded, size: 16),
-                        label: const Text('Videos'),
-                        selected: !_radio,
-                        onSelected: (_) => setState(() => _radio = false),
+                    const SizedBox(height: Space.lg),
+                    TextField(
+                      controller: _controller,
+                      textInputAction: TextInputAction.search,
+                      onChanged: _setQuery,
+                      onSubmitted: (v) => _setQuery(v, immediate: true),
+                      onTapOutside: (_) => FocusScope.of(context).unfocus(),
+                      decoration: InputDecoration(
+                        prefixIcon: const Icon(Icons.search_rounded),
+                        hintText: _radio ? 'Stations, cities, genres' : 'Songs, artists, videos — then search',
+                        suffixIcon: _controller.text.isEmpty
+                            ? null
+                            : IconButton(
+                                tooltip: 'Clear',
+                                icon: const Icon(Icons.close_rounded),
+                                onPressed: () {
+                                  _controller.clear();
+                                  _setQuery('', immediate: true);
+                                },
+                              ),
                       ),
-                      const SizedBox(width: Space.sm),
-                      ChoiceChip(
-                        avatar: const Icon(Icons.radio_rounded, size: 16),
-                        label: const Text('Radio'),
-                        selected: _radio,
-                        onSelected: (_) => setState(() {
-                          _radio = true;
-                          _query = _controller.text.trim(); // radio results are free: show them now
-                        }),
-                      ),
-                    ],
-                  ),
-                ],
+                    ),
+                    const SizedBox(height: Space.md),
+                    Row(
+                      children: [
+                        ChoiceChip(
+                          avatar: const Icon(Icons.smart_display_rounded, size: 16),
+                          label: const Text('Videos'),
+                          selected: !_radio,
+                          onSelected: (_) => setState(() => _radio = false),
+                        ),
+                        const SizedBox(width: Space.sm),
+                        ChoiceChip(
+                          avatar: const Icon(Icons.radio_rounded, size: 16),
+                          label: const Text('Radio'),
+                          selected: _radio,
+                          onSelected: (_) => setState(() {
+                            _radio = true;
+                            _query = _controller.text.trim(); // radio results are free: show them now
+                          }),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
-            ),
-            Expanded(
-              child: _query.isEmpty
-                  ? _RecentSearches(
-                      searches: store.recentSearches,
-                      onPick: (q) {
-                        _controller.text = q;
-                        _setQuery(q, immediate: true);
-                      },
-                      onClear: () async {
-                        await store.clearRecentSearches();
-                        setState(() {});
-                      },
-                    )
-                  : _Results(query: _query, radio: _radio, bottomInset: bottomInset),
-            ),
-          ],
+              Expanded(
+                child: _query.isEmpty
+                    ? _RecentSearches(
+                        searches: store.recentSearches,
+                        onPick: (q) {
+                          _controller.text = q;
+                          _setQuery(q, immediate: true);
+                        },
+                        onClear: () async {
+                          await store.clearRecentSearches();
+                          setState(() {});
+                        },
+                      )
+                    : _Results(query: _query, radio: _radio, bottomInset: bottomInset),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -164,12 +167,10 @@ class _Results extends ConsumerWidget {
       ),
       data: (tracks) => tracks.isEmpty
           ? EmptyState(icon: Icons.search_off_rounded, title: 'No matches', message: 'Nothing for "$query" yet.')
-          : ListView.builder(
-              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          : TrackListView(
+              tracks: tracks,
+              onTap: (i) => playTrackFromList(context, ref, tracks, i),
               padding: EdgeInsets.only(bottom: bottomInset),
-              itemCount: tracks.length,
-              itemBuilder: (_, i) =>
-                  TrackTile(track: tracks[i], onTap: () => playTrackFromList(context, ref, tracks, i)),
             ),
     );
   }
@@ -191,11 +192,23 @@ class _RecentSearches extends StatelessWidget {
         message: 'Songs and music videos from YouTube, plus thousands of live radio stations.',
       );
     }
+    final c = context.synk;
     return ListView(
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       children: [
-        SectionHeader('Recent', action: 'Clear', onAction: onClear),
+        SectionHeader('Recent searches', action: 'Clear', onAction: onClear),
         for (final q in searches)
-          ListTile(leading: const Icon(Icons.history_rounded), title: Text(q), onTap: () => onPick(q)),
+          ListTile(
+            leading: Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(color: c.surfaceOverlay, shape: BoxShape.circle),
+              child: Icon(Icons.history_rounded, size: 18, color: c.textSecondary),
+            ),
+            title: Text(q, maxLines: 1, overflow: TextOverflow.ellipsis),
+            trailing: Icon(Icons.north_west_rounded, size: 18, color: c.textMuted),
+            onTap: () => onPick(q),
+          ),
       ],
     );
   }

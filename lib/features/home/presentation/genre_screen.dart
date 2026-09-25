@@ -18,7 +18,7 @@ class GenreScreen extends StatelessWidget {
     final vibe = Vibes.byLabel(label);
     if (vibe == null) {
       return Scaffold(
-        appBar: AppBar(),
+        appBar: AppBar(leading: const CircleBackButton()),
         body: const Center(
           child: EmptyState(icon: Icons.search_off_rounded, title: 'Vibe not found'),
         ),
@@ -34,24 +34,52 @@ class GenreScreen extends StatelessWidget {
           headerSliverBuilder: (_, _) => [
             SliverAppBar(
               pinned: true,
-              expandedHeight: 180,
-              backgroundColor: color,
-              foregroundColor: Colors.white,
-              flexibleSpace: FlexibleSpaceBar(
-                title: Text(vibe.label, style: context.text.headlineSmall?.copyWith(color: Colors.white)),
-                background: ColoredBox(
-                  color: color,
-                  child: Align(
-                    alignment: const Alignment(0.9, 0.2),
-                    child: Icon(vibe.icon, size: 110, color: Colors.white.withValues(alpha: 0.3)),
+              leading: const CircleBackButton(),
+              title: SplitTitle('${vibe.label} vibe', style: context.text.headlineSmall),
+            ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(Space.gutter, Space.sm, Space.gutter, 0),
+                child: Container(
+                  height: 124,
+                  padding: const EdgeInsets.symmetric(horizontal: Space.xl),
+                  clipBehavior: Clip.antiAlias,
+                  decoration: BoxDecoration(color: color, borderRadius: Radii.xlAll),
+                  child: Stack(
+                    children: [
+                      Positioned(
+                        right: -Space.lg,
+                        top: -Space.md,
+                        child: Transform.rotate(
+                          angle: 0.25,
+                          child: Icon(vibe.icon, size: 150, color: Colors.white.withValues(alpha: 0.18)),
+                        ),
+                      ),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(vibe.label, style: context.text.displaySmall?.copyWith(color: Colors.white)),
+                            const SizedBox(height: Space.xs),
+                            Text(
+                              tabs.join(' · '),
+                              style: context.text.labelMedium?.copyWith(color: Colors.white.withValues(alpha: 0.85)),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
             ),
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(Space.gutter, Space.md, Space.gutter, Space.sm),
+                padding: const EdgeInsets.fromLTRB(Space.gutter, Space.lg, Space.gutter, Space.sm),
                 child: GlassPanel(
+                  color: context.synk.surface,
                   radius: Radii.pillAll,
                   padding: const EdgeInsets.all(4),
                   child: TabBar(tabs: [for (final t in tabs) Tab(height: 36, text: t)]),
@@ -93,11 +121,10 @@ class _GenreList extends ConsumerWidget {
           ? const Center(
               child: EmptyState(icon: Icons.music_off_rounded, title: 'Nothing here yet'),
             )
-          : ListView.builder(
-              padding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom + Space.xxl),
-              itemCount: tracks.length,
-              itemBuilder: (_, i) =>
-                  TrackTile(track: tracks[i], onTap: () => playTrackFromList(context, ref, tracks, i)),
+          : TrackListView(
+              tracks: tracks,
+              onTap: (i) => playTrackFromList(context, ref, tracks, i),
+              padding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom + 160),
             ),
     );
   }

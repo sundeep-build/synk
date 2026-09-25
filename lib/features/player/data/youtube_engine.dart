@@ -231,7 +231,11 @@ class YouTubeEngine implements MediaEngine {
     final c = _controller;
     final id = _track?.youtubeId;
     if (c == null || id == null) return;
-    final start = _position.inMilliseconds / 1000;
+    // YouTube rejects a start at or past the end ("invalid parameter"): start
+    // over instead of showing a black player.
+    final durationS = (_track?.durationMs ?? 0) / 1000;
+    var start = _position.inMilliseconds / 1000;
+    if (start < 0 || (durationS > 0 && start >= durationS - 1)) start = 0;
     final timedOut = await _guard(
       c,
       () => _wantPlay && _foreground

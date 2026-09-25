@@ -8,6 +8,7 @@ import '../../features/auth/application/session.dart';
 import '../../features/auth/presentation/welcome_screen.dart';
 import '../../features/home/presentation/genre_screen.dart';
 import '../../features/home/presentation/home_screen.dart';
+import '../../features/home/presentation/trending_screen.dart';
 import '../../features/library/presentation/library_screen.dart';
 import '../../features/library/presentation/playlist_screen.dart';
 import '../../features/player/presentation/now_playing_screen.dart';
@@ -58,6 +59,7 @@ final routerProvider = Provider<GoRouter>((ref) {
                     builder: (_, s) => GenreScreen(label: s.pathParameters['label']!),
                   ),
                   GoRoute(path: 'live', builder: (_, _) => const LiveRoomsScreen()),
+                  GoRoute(path: 'trending', builder: (_, _) => const TrendingScreen()),
                 ],
               ),
             ],

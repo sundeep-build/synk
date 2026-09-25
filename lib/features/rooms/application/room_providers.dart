@@ -42,7 +42,12 @@ final myRoomsProvider = FutureProvider.autoDispose<List<Room>>((ref) async {
   final link = ref.keepAlive();
   final timer = Timer(const Duration(seconds: 60), link.close);
   ref.onDispose(timer.cancel);
-  return ref.watch(roomRepositoryProvider).hostedBy(uid);
+  try {
+    return await ref.watch(roomRepositoryProvider).hostedBy(uid);
+  } catch (e, st) {
+    AppLogger.error('MyRooms', e, st);
+    rethrow;
+  }
 });
 
 /// First few people in a room, for the avatar stacks on Home and Live now.

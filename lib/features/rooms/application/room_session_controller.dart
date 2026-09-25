@@ -52,6 +52,10 @@ class RoomSessionController extends Notifier<RoomSession?> implements TransportD
   Timer? _advanceTimer;
   int? _loadedSeq;
   int? _advanceArmedFor;
+
+  /// The seq whose advance found nothing to play: no more retries until
+  /// someone queues a song.
+  int? _stuckOn;
   String? _cleanedQueueItem;
   ({int count, String? trackId})? _lastBeat;
   DateTime _lastBeatAt = DateTime.fromMillisecondsSinceEpoch(0);
@@ -186,6 +190,7 @@ class RoomSessionController extends Notifier<RoomSession?> implements TransportD
     }
     _loadedSeq = null;
     _advanceArmedFor = null;
+    _stuckOn = null;
     _cleanedQueueItem = null;
     _lastBeat = null;
     _knownItems.clear();
@@ -228,6 +233,11 @@ class RoomSessionController extends Notifier<RoomSession?> implements TransportD
       final resolve = qid != null && s.playingItem?.id != qid && _knownItems.containsKey(qid);
       return s.copyWith(queue: queue, playingItem: resolve ? () => _knownItems[qid] : null);
     });
+    // Someone queued a song while the room had run out: try again now.
+    if (_stuckOn != null && (state?.upcoming.isNotEmpty ?? false)) {
+      if (_advanceArmedFor == _stuckOn) _advanceArmedFor = null;
+      _stuckOn = null;
+    }
   }
 
   void _onPlayback(RoomPlayback p) {
@@ -245,7 +255,10 @@ class RoomSessionController extends Notifier<RoomSession?> implements TransportD
     final s = state;
     if (s == null || s.locallyPaused) return;
     final track = p.track;
-    if (track == null) {
+    // Nothing on, or we joined after this song finished and the room is
+    // waiting for the next one. (Loading a video at its last second fails
+    // with "invalid parameter" and leaves a black player.)
+    if (track == null || p.hasEnded(_clock.nowMs())) {
       if (_audio.playing) await _audio.pauseLocal();
       return;
     }
@@ -283,6 +296,7 @@ class RoomSessionController extends Notifier<RoomSession?> implements TransportD
 
     final idleWithQueue = p.track == null && s.upcoming.isNotEmpty;
     final ended = p.hasEnded(_clock.nowMs());
+    if (ended != s.songEnded) _update((cur) => cur.copyWith(songEnded: ended));
     final votedOut = p.track != null && s.members.length > 1 && s.skipVotesForCurrent >= s.skipThreshold;
     if (idleWithQueue || ended || votedOut) _armAdvance(p.seq);
 
@@ -342,11 +356,13 @@ class RoomSessionController extends Notifier<RoomSession?> implements TransportD
       final head = pick ?? (explicit == null ? s.upcoming.firstOrNull : null);
       var next = explicit ?? head?.track;
       if (next == null) {
-        if (s.room.mode == RoomMode.radio) return;
-        next = await ref
-            .read(catalogRepositoryProvider)
-            .nextSimilar(s.playback.track, regionCode: ref.read(regionCodeProvider), exclude: _recentlyPlayed.toSet());
-        if (next == null || state?.playback.seq != fromSeq) return;
+        if (s.room.mode != RoomMode.radio) next = await _autoplayPick(s);
+        if (state?.playback.seq != fromSeq) return;
+        if (next == null) {
+          // Nothing to play until someone adds a song (_onQueue retries).
+          _stuckOn = fromSeq;
+          return;
+        }
       }
       final won = await _live.advance(s.room.id, fromSeq: fromSeq, next: next, by: s.myUid, queueItemId: head?.id);
       if (won && head != null) await _live.removeFromQueue(s.room.id, head.id);
@@ -357,6 +373,23 @@ class RoomSessionController extends Notifier<RoomSession?> implements TransportD
         if (_advanceArmedFor == fromSeq) _advanceArmedFor = null;
       });
     }
+  }
+
+  /// Next song when the queue is empty: a similar trending one, or, when
+  /// those can't be fetched (no YouTube key in this build, daily quota used
+  /// up), one the room already played. Network errors still throw (retried).
+  Future<Track?> _autoplayPick(RoomSession s) async {
+    try {
+      final similar = await ref
+          .read(catalogRepositoryProvider)
+          .nextSimilar(s.playback.track, regionCode: ref.read(regionCodeProvider), exclude: _recentlyPlayed.toSet());
+      if (similar != null) return similar;
+    } on YouTubeNotConfiguredException {
+      // Radio-only build: fall through to replaying.
+    } on ServiceUnavailableException catch (e) {
+      AppLogger.info('RoomAdvance', 'autoplay unavailable: ${e.message}');
+    }
+    return RoomRules.replayCandidate(s.played, currentId: s.playback.track?.id);
   }
 
   void _remember(String trackId) {
@@ -399,7 +432,8 @@ class RoomSessionController extends Notifier<RoomSession?> implements TransportD
   Future<void> playOrQueue(Track track) async {
     final s = state;
     if (s == null) return;
-    if (s.canControl && (s.room.mode == RoomMode.radio || s.playback.track == null)) {
+    // Nothing playing (or the last song ended): a controller's pick plays now.
+    if (s.canControl && (s.room.mode == RoomMode.radio || s.playback.track == null || s.songEnded)) {
       // Already queued → play that entry, so it isn't played a second time later.
       final queued = s.upcoming.where((q) => q.track.id == track.id).firstOrNull;
       await _advance(s.playback.seq, explicit: queued == null ? track : null, pick: queued);

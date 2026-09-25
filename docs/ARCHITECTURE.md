@@ -23,6 +23,18 @@ lib/
 Features: `auth`, `profile`, `catalog` (media sources), `player`, `rooms` (including huddles), `home`, `search`,
 `library`.
 
+## Design system (`core/design_system`)
+
+Flat and dark: deep navy neutrals (`ink950` background → `ink800` raised discs) with the logo's colours as solid
+accents: violet for primary actions and the selected tab, pink for selections and likes, cyan for progress and "now
+playing". The only gradient is the logo itself. Montserrat throughout. Section titles pair a heavy first word with a
+light rest (`SectionHeader`, `SplitTitle`) beside a short accent bar.
+
+Building blocks: `CircleIconButton` / `CircleBackButton` (round raised icons in headers), `PlayStateButton` (track
+rows), `PillButton` (Play/Playing, Room code), `SegmentIndicator` (carousels), `DuotoneCover` (artwork tinted one
+colour, used on room tickets), `GridBackdrop` (faint studio grid), `BrandWordmark`. Screens use these and theme styles
+rather than one-off colours.
+
 ## Media sources and playback engines
 
 Two sources, chosen because both are free *and* legal to use this way:
@@ -63,7 +75,7 @@ users/{uid}                    username, displayName, avatarEmoji, avatarColor, 
   playlists/{id}               name, tracks[≤200 compact], updatedAt      ← one read per playlist
 usernames/{name}               uid                                       ← uniqueness (rules + transaction)
 rooms/{roomId}                 name, code, host*, visibility, mode, capacity, vibe,
-                               listenerCount, isLive, lastActiveAt, nowPlaying{}
+                               listenerCount, isLive, closed, lastActiveAt, nowPlaying{}
 roomCodes/{CODE}               roomId                                    ← join by code, private rooms
 ```
 
@@ -171,8 +183,15 @@ The rules in `firebase/` are the backend. Both files load cleanly into the Fireb
 - Usernames: the `usernames/{name}` document is created in the same transaction as the profile. Rules require
   each to reference the other (`getAfter`), so a race for a name can't be won twice.
 - Users can't grant themselves `isPro`. Profile updates may only touch whitelisted fields.
-- Rooms: listing returns public rooms only. Heartbeat updates may change only live-status fields, bounded by capacity
-  and stamped with `request.time`.
+- Rooms: listing returns public rooms, plus a host's own rooms (Home → *Your rooms*). Heartbeat updates may change
+  only live-status fields, bounded by capacity and stamped with `request.time`. Only the host can set `closed`, a
+  closed room stays closed, and it can never be marked live again. `scripts/firestore_rules_smoke.py` checks this.
+
+**Room lifecycle.** *Live* while people are in it (the leader's heartbeat keeps `isLive` and `lastActiveAt` fresh).
+*Idle* once the last person leaves (`isLive: false`), or *stale* when the app was killed without a clean leave (no
+heartbeat for 3 minutes). Either way it drops out of Live now, but its host still sees it under *Your rooms*
+(`hostedBy`: `hostId ==` + `createdAt desc`, one composite index) and reopening it makes it live again. Listeners can't
+join an idle room until its host is back. *Closed* when the host ends it: gone for good.
 - RTDB:
   - Only present members can read chat or write queue, votes or chat.
   - Playback writes are allowed for the host, for anyone while the host is away (acting host), or for any member
@@ -199,8 +218,12 @@ The rules in `firebase/` are the backend. Both files load cleanly into the Fireb
 - The ambient background decodes artwork at **48 px** and blurs it (about 9 KB).
 - Global image cache is capped at 60 MB / 250 images, and the Firestore disk cache at 40 MB. RTDB persistence is
   **off** on purpose, so the app never plays stale room state.
-- Only the dock (nav + mini player) uses a real `BackdropFilter`, and only one of them. Other "glass" is a translucent
-  fill.
+- No `BackdropFilter` anywhere: a live blur re-renders on every frame of scrolling beneath it, the main source of jank
+  on budget Android phones. The dock is a solid panel. The studio grid behind brand screens is painted once and
+  cached.
+- Long track lists use a fixed row extent (`TrackListView` / `SliverPrototypeExtentList` with
+  `TrackTile.prototype`), so layout doesn't grow with list length. Rows repaint only when *their* play state changes.
+- Tinted covers (`DuotoneCover`) tint through the image's own colour filter, so they add no extra layer.
 - Animations stop when idle or off-screen (equalizers, aurora), respect *Reduce motion*, and sit behind
   `RepaintBoundary`.
 - Floating reactions are capped at 14 live animations, and chat at 200 messages in memory.

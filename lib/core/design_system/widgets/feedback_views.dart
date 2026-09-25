@@ -2,25 +2,75 @@ import 'package:flutter/material.dart';
 
 import '../../error/app_exception.dart';
 import '../synk_colors.dart';
+import '../synk_type.dart';
 import '../tokens.dart';
 
+/// Section title with a short accent bar. The first word is heavy and the
+/// rest light ("Trending videos" → **Trending** videos). Optional "See all ›".
 class SectionHeader extends StatelessWidget {
-  const SectionHeader(this.title, {this.action, this.onAction, super.key});
+  const SectionHeader(this.title, {this.action, this.onAction, this.accent, super.key});
 
   final String title;
   final String? action;
   final VoidCallback? onAction;
 
+  /// Accent bar colour; defaults to the logo's cyan.
+  final Color? accent;
+
   @override
   Widget build(BuildContext context) {
+    final c = context.synk;
+    final space = title.indexOf(' ');
+    final head = space < 0 ? title : title.substring(0, space);
+    final tail = space < 0 ? '' : title.substring(space);
+    final style = context.text.headlineSmall!;
     return Padding(
       padding: const EdgeInsets.fromLTRB(Space.gutter, Space.xl, Space.sm, Space.md),
       child: Row(
         children: [
-          Expanded(
-            child: Semantics(header: true, child: Text(title, style: context.text.headlineSmall)),
+          Container(
+            width: 3,
+            height: 22,
+            decoration: BoxDecoration(
+              color: accent ?? context.colors.tertiary,
+              borderRadius: const BorderRadius.all(Radius.circular(2)),
+            ),
           ),
-          if (action != null) TextButton(onPressed: onAction, child: Text(action!)),
+          const SizedBox(width: Space.sm + 2),
+          Expanded(
+            child: Semantics(
+              header: true,
+              child: Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(text: head, style: context.weight(style, FontWeight.w800)),
+                    if (tail.isNotEmpty) TextSpan(text: tail, style: context.weight(style, FontWeight.w400)),
+                  ],
+                ),
+                style: style,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ),
+          if (action != null)
+            TextButton(
+              onPressed: onAction,
+              style: TextButton.styleFrom(foregroundColor: c.textSecondary, visualDensity: VisualDensity.compact),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(action!, style: context.text.labelMedium?.copyWith(color: c.textSecondary)),
+                  const SizedBox(width: 6),
+                  Container(
+                    width: 16,
+                    height: 16,
+                    decoration: BoxDecoration(color: c.textSecondary, shape: BoxShape.circle),
+                    child: Icon(Icons.chevron_right_rounded, size: 14, color: c.background),
+                  ),
+                ],
+              ),
+            ),
         ],
       ),
     );

@@ -52,7 +52,7 @@ class _RoomScreenState extends ConsumerState<RoomScreen> {
 
     if (_error != null) {
       return Scaffold(
-        appBar: AppBar(leading: const BackButton()),
+        appBar: AppBar(leading: const CircleBackButton()),
         body: Center(
           child: ErrorState(error: _error!, onRetry: _join),
         ),
@@ -137,6 +137,7 @@ class _RoomBodyState extends ConsumerState<_RoomBody> {
                     Padding(
                       padding: const EdgeInsets.fromLTRB(Space.gutter, Space.md, Space.gutter, 0),
                       child: GlassPanel(
+                        color: context.synk.surface,
                         radius: Radii.pillAll,
                         padding: const EdgeInsets.all(4),
                         child: TabBar(
@@ -213,11 +214,14 @@ class _RoomHeader extends ConsumerWidget {
       padding: const EdgeInsets.fromLTRB(Space.xs, Space.xs, Space.xs, Space.md),
       child: Row(
         children: [
-          IconButton(
+          const SizedBox(width: Space.xs),
+          CircleIconButton(
             tooltip: 'Minimise (keeps playing)',
-            icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 30),
+            icon: Icons.keyboard_arrow_down_rounded,
+            size: 42,
             onPressed: () => context.canPop() ? context.pop() : context.go(Routes.home),
           ),
+          const SizedBox(width: Space.sm),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -228,29 +232,40 @@ class _RoomHeader extends ConsumerWidget {
                   children: [
                     const LiveBadge(compact: true),
                     const SizedBox(width: Space.sm),
-                    Semantics(
-                      button: true,
-                      label: 'Copy room code ${room.code.split('').join(' ')}',
-                      onTap: () => _copyCode(context),
-                      excludeSemantics: true,
-                      child: InkWell(
-                        borderRadius: Radii.pillAll,
+                    // Shrinks (never overflows) on narrow phones with the huddle button in the row.
+                    Flexible(
+                      child: Semantics(
+                        button: true,
+                        label: 'Copy room code ${room.code.split('').join(' ')}',
                         onTap: () => _copyCode(context),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: Space.sm, vertical: 3),
-                          decoration: BoxDecoration(
-                            border: Border.all(color: context.synk.glassBorder),
-                            borderRadius: Radii.pillAll,
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (!room.isPublic) ...[
-                                Icon(Icons.lock_rounded, size: 12, color: context.synk.textSecondary),
-                                const SizedBox(width: 4),
+                        excludeSemantics: true,
+                        child: InkWell(
+                          borderRadius: Radii.pillAll,
+                          onTap: () => _copyCode(context),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: Space.sm, vertical: 3),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: context.synk.glassBorder),
+                              borderRadius: Radii.pillAll,
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (!room.isPublic) ...[
+                                  Icon(Icons.lock_rounded, size: 12, color: context.synk.textSecondary),
+                                  const SizedBox(width: 4),
+                                ],
+                                Flexible(
+                                  child: Text(
+                                    room.code,
+                                    maxLines: 1,
+                                    softWrap: false,
+                                    overflow: TextOverflow.fade,
+                                    style: context.text.labelSmall?.copyWith(letterSpacing: 2),
+                                  ),
+                                ),
                               ],
-                              Text(room.code, style: context.text.labelSmall?.copyWith(letterSpacing: 2)),
-                            ],
+                            ),
                           ),
                         ),
                       ),

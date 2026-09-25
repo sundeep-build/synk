@@ -19,6 +19,7 @@ class RoomSession {
     this.playingItem,
     this.played = const [],
     this.locallyPaused = false,
+    this.songEnded = false,
     this.ended = false,
   });
 
@@ -41,6 +42,10 @@ class RoomSession {
 
   /// A listener muted the room on their device only (room keeps playing).
   final bool locallyPaused;
+
+  /// The current song has played to its end and the room is waiting for the
+  /// next one (nothing queued yet, or autoplay found nothing).
+  final bool songEnded;
 
   /// The host closed the room while we were in it.
   final bool ended;
@@ -71,6 +76,8 @@ class RoomSession {
     final qid = next.queueItemId;
     return copyWith(
       playback: next,
+      // A new anchor (next song, play, seek) means it's playing again.
+      songEnded: false,
       playingItem: () => qid == null ? null : (known[qid] ?? (playingItem?.id == qid ? playingItem : null)),
       played: changed && finished != null
           ? [finished, ...played.where((t) => t.id != finished.id)].take(maxPlayed).toList()
@@ -87,6 +94,7 @@ class RoomSession {
     ValueGetter<QueueItem?>? playingItem,
     List<Track>? played,
     bool? locallyPaused,
+    bool? songEnded,
     bool? ended,
   }) => RoomSession(
     room: room ?? this.room,
@@ -98,6 +106,7 @@ class RoomSession {
     playingItem: playingItem == null ? this.playingItem : playingItem(),
     played: played ?? this.played,
     locallyPaused: locallyPaused ?? this.locallyPaused,
+    songEnded: songEnded ?? this.songEnded,
     ended: ended ?? this.ended,
   );
 }

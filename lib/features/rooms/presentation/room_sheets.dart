@@ -94,7 +94,7 @@ class _CreateRoomSheetState extends ConsumerState<_CreateRoomSheet> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Start a room', style: context.text.headlineMedium),
+                SplitTitle('Start a room', style: context.text.headlineMedium),
                 const SizedBox(height: Space.xs),
                 Text(
                   'Watch YouTube or listen to live radio together, in sync.',
@@ -239,7 +239,7 @@ class _JoinRoomSheetState extends ConsumerState<_JoinRoomSheet> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Join with a code', style: context.text.headlineMedium),
+              SplitTitle('Join with a code', style: context.text.headlineMedium),
               const SizedBox(height: Space.xl),
               TextField(
                 controller: _code,

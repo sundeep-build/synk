@@ -15,6 +15,7 @@ abstract final class Routes {
   static String playlist(String id) => '$library/playlist/$id';
   static String genre(String label) => '$home/genre/${Uri.encodeComponent(label)}';
   static const liveRooms = '$home/live';
+  static const trending = '$home/trending';
   static String join(String code) => '/join/$code';
 
   /// Screens that exist only before the user is fully signed in.
