@@ -17,6 +17,9 @@ class HuddleMedia {
   MediaStream? _camera;
   bool _front = true;
 
+  /// Audio was switched to call mode and must be handed back on [close].
+  bool _routed = false;
+
   MediaStream? get stream => _stream;
   MediaStreamTrack? get audioTrack => _stream?.getAudioTracks().firstOrNull;
 
@@ -28,6 +31,7 @@ class HuddleMedia {
   /// Routes audio for talking and opens the mic (this shows the permission
   /// prompt the first time).
   Future<void> open({required bool mic}) async {
+    _routed = true;
     await _routeForCall();
     _stream = await navigator.mediaDevices.getUserMedia({
       'audio': {'echoCancellation': true, 'noiseSuppression': true, 'autoGainControl': true},
@@ -83,7 +87,11 @@ class HuddleMedia {
       }
       await stream.dispose();
     }
-    await _routeForMusic();
+    // Also when a leave raced the mic opening: getUserMedia switched modes.
+    if (_routed || stream != null) {
+      _routed = false;
+      await _routeForMusic();
+    }
   }
 
   Future<void> _routeForCall() async {

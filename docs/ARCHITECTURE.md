@@ -20,7 +20,8 @@ lib/
     presentation/              screens and widgets
 ```
 
-Features: `auth`, `profile`, `catalog` (media sources), `player`, `rooms`, `home`, `search`, `library`.
+Features: `auth`, `profile`, `catalog` (media sources), `player`, `rooms` (including huddles), `home`, `search`,
+`library`.
 
 ## Media sources and playback engines
 
@@ -77,6 +78,8 @@ roomsLive/{roomId}/skipVotes/{uid} = seq
 roomChats/{roomId}/{push}          chat, kept separate so playback listeners never download chat
 roomReactions/{roomId}/{push}      ephemeral, queried with startAt(now), so old reactions never replay
 throttle/{uid}/{chat|react}        last write time; the rules use it for rate limiting
+huddles/{roomId}/members/{uid}     {name, emoji, color, sid, mic, cam, joinedAt}  + onDisconnect().remove()
+huddles/{roomId}/signals/{uid}/{push}  that member's inbox: {f, fs, ts, t: offer|answer|ice, sdp | c, at}
 ```
 
 **Why two databases?** Firestore bills per document read. A 20-person room chatting 100 messages costs
@@ -117,6 +120,50 @@ Bandwidth is the same for 2 listeners or 50.
 - Vote-to-skip: members write `skipVotes/{uid} = seq`. When a simple majority is reached, the room advances through
   the same transaction. Votes cast for an old `seq` are ignored automatically.
 
+## Huddles (voice, plus camera, inside a room)
+
+A huddle is an opt-in call among people in the same room, layered over the room's music. It needs no server:
+media goes **peer to peer** (WebRTC mesh via `flutter_webrtc`), and only signalling goes through RTDB, a few KB
+per connection.
+
+```text
+HuddleController (application)   one task queue: member changes, signals, retries and camera toggles never interleave
+  ├─ HuddleSignaling (data)      members list + each member's own inbox in RTDB
+  ├─ HuddleMedia (data)          mic, camera, audio routing
+  └─ PeerLink × (n−1) (data)     one RTCPeerConnection per other member
+```
+
+| Decision | Why |
+| --- | --- |
+| Mesh, capped at **8 people / 4 cameras** (`AppConfig`) | Free and serverless. Every camera is encoded once per peer, so the caps keep a phone under ~1.5 Mbps up and a mid-range CPU cool. |
+| The member whose uid sorts first sends the offer (`HuddleRules.isOfferer`) | Both sides agree without talking, so offers never cross ("glare"). |
+| One inbox per member (`signals/{uid}`), read only by its owner | Signalling traffic per phone grows with the group, not with its square. Handled messages are deleted in one batched write per second. |
+| Every message carries `fs`/`ts` session ids; each join gets a new `sid` | Messages meant for a previous join are ignored, and a rejoin rebuilds connections cleanly. |
+| Audio and video transceivers negotiated up front | Camera on/off is a local `replaceTrack`, with no renegotiation. `members/{uid}/cam` tells others to show video or the avatar. |
+| Opus fmtp rewritten: `usedtx=1; useinbandfec=1; stereo=0; maxaveragebitrate=32000` | Near-zero bitrate while silent, which is most of a group call. FEC rides out mobile packet loss. |
+| Video budget per connection (`HuddleRules`): ~1.2 Mbps total split across peers (150–600 kbps each), 24→15 fps, 640×480 → ×1.5/×2 smaller as the group grows | The per-peer encode cost falls as the mesh grows. |
+| ICE candidates batched (150 ms, ≤10 per write), sent only after the SDP | Fewer writes, and the receiver never gets ICE for a connection it hasn't created. |
+| Failed connection → the offerer rebuilds it with backoff (2/4/8/16 s, then shows "Can't connect") | Survives network switches. An ICE restart would save one round trip, but a rebuild is simpler and always recovers. |
+| Server dropped us (onDisconnect fired during a blip) → rejoin under a new sid | Peers had already torn down; a new session reconnects everyone. |
+
+**Audio.** Android runs in communication mode (hardware echo cancelling) but **does not take audio focus**,
+because just_audio would pause the room's radio. iOS uses `playAndRecord` + `videoChat` (loudspeaker by default).
+Leaving hands the session back to the music configuration. Speaking rings come from WebRTC `audioLevel` stats,
+sampled every 400 ms and only while a widget watches `huddleSpeakingProvider`.
+
+**Background.** Android 11+ allows background mic access only from a foreground service of type `microphone`
+(`HuddleService.kt`, "In a huddle" notification), started while the app is visible. The camera switches off
+while the app is hidden and back on when it returns. iOS keeps the mic through the existing `audio` background
+mode.
+
+**Memory.** Video renderers (GPU textures) exist only for cameras that are on *and* on screen: the huddle view's
+grid is lazy, and the in-room strip shows avatars with a camera badge, not video. Turning the camera off stops
+capture and disposes the stream, rather than muting it.
+
+**NAT traversal.** Google STUN is the default. Some mobile carriers need a TURN relay. Set `TURN_URLS`,
+`TURN_USERNAME` and `TURN_CREDENTIAL` in `env/*.json` (e.g. Metered's free tier). Without them most calls still
+connect, but some on strict networks won't.
+
 ## Security model
 
 The rules in `firebase/` are the backend. Both files load cleanly into the Firebase emulators.
@@ -133,6 +180,10 @@ The rules in `firebase/` are the backend. Both files load cleanly into the Fireb
   - Chat is rate-limited to 1 message per 0.8 s and reactions to 1 per 0.25 s, using a multi-path write that stamps
     `throttle/{uid}` and the rule check `root(old) < now − limit`.
   - All timestamps must equal the server's `now`.
+  - Huddles: only people present in the room can join its huddle or see who's in it, and not once it's closed.
+    Members edit only their own entry. A signal may be sent only by a huddle member, as themselves, to another
+    huddle member. Each inbox is readable and deletable only by its owner. Signals are size-capped
+    (SDP ≤ 20 KB, ICE batch ≤ 12 KB).
 
 **Known MVP trade-offs**, each fixed by one Cloud Function on Blaze:
 
@@ -140,6 +191,7 @@ The rules in `firebase/` are the backend. Both files load cleanly into the Fireb
 - A member could force a skip without votes (`seq+1`).
 - `listenerCount` is written by clients.
 - Chat history is never pruned.
+- Huddle size and camera caps are checked on the client only, and signals aren't rate-limited.
 
 ## Performance and memory budget
 
@@ -152,6 +204,8 @@ The rules in `firebase/` are the backend. Both files load cleanly into the Fireb
 - Animations stop when idle or off-screen (equalizers, aurora), respect *Reduce motion*, and sit behind
   `RepaintBoundary`.
 - Floating reactions are capped at 14 live animations, and chat at 200 messages in memory.
+- Huddles: see *Huddles → Memory* above (renderers only for visible cameras, camera fully released when off,
+  stats polled only while watched).
 - Large JSON (above 48 KB) is decoded on a background isolate. A single pooled HTTP client is used, and catalog calls
   go through a 10-minute LRU cache.
 
@@ -161,6 +215,7 @@ The rules in `firebase/` are the backend. Both files load cleanly into the Fireb
 | --- | --- |
 | Going public | Blaze plan with a budget alert. App Check. Report/block and word filter. |
 | Rooms above ~50 or abuse appears | Cloud Functions: presence → `listenerCount`, server-side capacity and skip enforcement, chat TTL pruning |
+| Huddles above 8 people, or "stage" rooms with many listeners | Switch `PeerLink` for an SFU (LiveKit or mediasoup, self-hosted or cloud). Each phone then sends one stream. It needs a Cloud Function to mint access tokens. `HuddleController` and the UI stay as they are. |
 | Above ~100k daily users | Shard RTDB (one instance per region/room hash). Use FCM for invites and dedications. Move discovery to a precomputed "top rooms" document. |
 | Mainstream catalog | Add a `TrackSource` for a licensed provider (the repository facade is the only change). Watch parties can use the official YouTube IFrame player, which is foreground-only under YouTube's terms. |
 

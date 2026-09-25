@@ -13,6 +13,7 @@ import '../../../core/utils/formatters.dart';
 import '../application/room_providers.dart';
 import '../application/room_session_controller.dart';
 import '../domain/room.dart';
+import 'widgets/huddle_bar.dart';
 import 'widgets/reaction_layer.dart';
 import 'widgets/room_chat.dart';
 import 'widgets/room_lists.dart';
@@ -86,6 +87,10 @@ class _RoomBody extends ConsumerStatefulWidget {
 }
 
 class _RoomBodyState extends ConsumerState<_RoomBody> {
+  /// Below this screen height (small phones, split screen) the player is
+  /// compact even without the keyboard, so the chat keeps some room.
+  static const double _compactPlayerBelow = 720;
+
   final _reactions = GlobalKey<ReactionLayerState>();
 
   @override
@@ -98,6 +103,7 @@ class _RoomBodyState extends ConsumerState<_RoomBody> {
     final queueCount = ref.watch(roomSessionProvider.select((s) => s?.upcoming.length ?? 0));
     final memberCount = ref.watch(roomSessionProvider.select((s) => s?.members.length ?? 0));
     final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
+    final compactPlayer = keyboardOpen || MediaQuery.sizeOf(context).height < _compactPlayerBelow;
     if (room == null || myUid == null) return const SizedBox.shrink();
 
     // Keep the chat stream subscribed while the room is open, even when the
@@ -116,10 +122,17 @@ class _RoomBodyState extends ConsumerState<_RoomBody> {
                 Column(
                   children: [
                     _RoomHeader(room: room, listeners: memberCount),
+                    // Tucked away while typing: the chat needs the height, and the
+                    // header's huddle button still opens the call.
                     AnimatedSize(
                       duration: Motion.medium,
                       curve: Motion.emphasized,
-                      child: RoomNowPlaying(compact: keyboardOpen),
+                      child: keyboardOpen ? const SizedBox(width: double.infinity) : HuddleBar(roomId: room.id),
+                    ),
+                    AnimatedSize(
+                      duration: Motion.medium,
+                      curve: Motion.emphasized,
+                      child: RoomNowPlaying(compact: compactPlayer),
                     ),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(Space.gutter, Space.md, Space.gutter, 0),
@@ -247,6 +260,7 @@ class _RoomHeader extends ConsumerWidget {
               ],
             ),
           ),
+          const HuddleHeaderButton(),
           _PeopleChip(count: listeners),
           PopupMenuButton<String>(
             tooltip: 'Room options',

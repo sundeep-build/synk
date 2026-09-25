@@ -37,5 +37,7 @@ jobs:
       - run: npm i -g firebase-tools
       # Compiles both rules files in the emulators; any rules error fails the job.
       - run: firebase emulators:exec --project demo-synk --only firestore,database "bash scripts/check_rules.sh"
-      # Behavioural checks: presence, host control, seq+1 advance, chat rate limits, closed rooms.
+      # Behavioural checks: presence, host control, seq+1 advance, chat rate limits, closed rooms, huddles.
       - run: firebase emulators:exec --project demo-synk --only database "python3 scripts/rtdb_rules_smoke.py"
+      # Room directory: hosts list their own rooms, only the host ends a room, ended rooms stay ended.
+      - run: firebase emulators:exec --project demo-synk --only firestore "python3 scripts/firestore_rules_smoke.py"

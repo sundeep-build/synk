@@ -109,9 +109,11 @@ service cloud.firestore {
       }
 
       allow get: if signedIn();
-      // Listing only ever returns public rooms (queries must filter on it),
-      // so private rooms are reachable by code alone.
-      allow list: if signedIn() && resource.data.visibility == 'public';
+      // Listing returns public rooms, plus a host's own rooms (Home → Your
+      // rooms; queries must filter on one or the other). Other people's
+      // private rooms are reachable by code alone.
+      allow list: if signedIn()
+        && (resource.data.visibility == 'public' || resource.data.hostId == request.auth.uid);
       allow create: if signedIn()
         && onlyKeys(['name', 'code', 'hostId', 'hostName', 'hostEmoji', 'hostColor', 'visibility',
                      'mode', 'capacity', 'vibe', 'coverColor', 'listenerCount', 'isLive',
@@ -121,13 +123,17 @@ service cloud.firestore {
         && incoming().listenerCount == 0
         && incoming().isLive == true;
       // Directory heartbeat by the room leader (see RoomRules.leader): only
-      // live-status fields, bounded, server-timestamped.
+      // live-status fields, bounded, server-timestamped. Only the host ends a
+      // room (`closed`), an ended room stays ended, and it never shows live.
       allow update: if signedIn()
-        && changedOnly(['listenerCount', 'isLive', 'nowPlaying', 'lastActiveAt'])
+        && changedOnly(['listenerCount', 'isLive', 'nowPlaying', 'lastActiveAt', 'closed'])
         && incoming().listenerCount is int
         && incoming().listenerCount >= 0
         && incoming().listenerCount <= resource.data.capacity
-        && incoming().lastActiveAt == request.time;
+        && incoming().lastActiveAt == request.time
+        && (!incoming().diff(resource.data).affectedKeys().hasAny(['closed'])
+            || (resource.data.hostId == request.auth.uid && incoming().closed == true))
+        && (incoming().get('closed', false) == false || incoming().isLive == false);
       allow delete: if signedIn() && resource.data.hostId == request.auth.uid;
     }
   }

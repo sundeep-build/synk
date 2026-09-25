@@ -102,6 +102,45 @@
       }
     },
 
+    "huddles": {
+      "$roomId": {
+        "members": {
+          ".read": "auth != null && root.child('roomsLive').child($roomId).child('presence').child(auth.uid).exists()",
+          "$uid": {
+            ".write": "auth != null && auth.uid === $uid && (!newData.exists() || (root.child('roomsLive').child($roomId).child('presence').child(auth.uid).exists() && root.child('roomsLive').child($roomId).child('meta/closed').val() !== true))",
+            ".validate": "newData.hasChildren(['name', 'emoji', 'color', 'sid', 'mic', 'cam', 'joinedAt'])",
+            "name": { ".validate": "newData.isString() && newData.val().length <= 20" },
+            "emoji": { ".validate": "newData.isString() && newData.val().length <= 8" },
+            "color": { ".validate": "newData.isNumber()" },
+            "sid": { ".validate": "newData.isString() && newData.val().length >= 8 && newData.val().length <= 24" },
+            "mic": { ".validate": "newData.isBoolean()" },
+            "cam": { ".validate": "newData.isBoolean()" },
+            "joinedAt": { ".validate": "newData.val() === now || newData.val() === data.val()" },
+            "$other": { ".validate": false }
+          }
+        },
+
+        "signals": {
+          "$to": {
+            ".read": "auth != null && auth.uid === $to",
+            ".write": "auth != null && auth.uid === $to && !newData.exists()",
+            "$msgId": {
+              ".write": "auth != null && ((auth.uid === $to && !newData.exists()) || (!data.exists() && newData.child('f').val() === auth.uid && root.child('huddles').child($roomId).child('members').child(auth.uid).exists() && root.child('huddles').child($roomId).child('members').child($to).exists()))",
+              ".validate": "newData.hasChildren(['f', 'fs', 'ts', 't', 'at'])",
+              "f": { ".validate": "newData.isString()" },
+              "fs": { ".validate": "newData.isString() && newData.val().length <= 24" },
+              "ts": { ".validate": "newData.isString() && newData.val().length <= 24" },
+              "t": { ".validate": "newData.isString() && newData.val().matches(/^(offer|answer|ice)$/)" },
+              "sdp": { ".validate": "newData.isString() && newData.val().length <= 20000" },
+              "c": { ".validate": "newData.isString() && newData.val().length <= 12000" },
+              "at": { ".validate": "newData.val() === now" },
+              "$other": { ".validate": false }
+            }
+          }
+        }
+      }
+    },
+
     "throttle": {
       "$uid": {
         "$kind": {

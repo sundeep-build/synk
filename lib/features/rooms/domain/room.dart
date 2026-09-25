@@ -49,6 +49,7 @@ class Room {
     this.coverColor = 0,
     this.listenerCount = 0,
     this.isLive = true,
+    this.closed = false,
     this.lastActiveAt,
     this.nowPlaying,
     this.createdAt,
@@ -68,11 +69,18 @@ class Room {
   final int coverColor;
   final int listenerCount;
   final bool isLive;
+
+  /// The host ended it for everyone. Unlike an idle room (everyone left),
+  /// an ended room can't be reopened.
+  final bool closed;
   final DateTime? lastActiveAt;
   final NowPlayingSummary? nowPlaying;
   final DateTime? createdAt;
 
   bool get isPublic => visibility == RoomVisibility.public;
+
+  /// People are in it right now, as far as the directory knows.
+  bool isActive([DateTime? now]) => isLive && !closed && listenerCount > 0 && !isStale(now);
 
   /// No heartbeat for a while → everyone left without a clean exit.
   bool isStale([DateTime? now]) {
@@ -99,6 +107,7 @@ class Room {
     coverColor: json.integer('coverColor'),
     listenerCount: json.integer('listenerCount'),
     isLive: json.boolean('isLive', true),
+    closed: json.boolean('closed'),
     lastActiveAt: json.time('lastActiveAt'),
     nowPlaying: NowPlayingSummary.fromJson(json.json('nowPlaying')),
     createdAt: json.time('createdAt'),
@@ -111,9 +120,10 @@ class Room {
       other.name == name &&
       other.listenerCount == listenerCount &&
       other.isLive == isLive &&
+      other.closed == closed &&
       other.nowPlaying == nowPlaying &&
       other.lastActiveAt == lastActiveAt;
 
   @override
-  int get hashCode => Object.hash(id, name, listenerCount, isLive, nowPlaying, lastActiveAt);
+  int get hashCode => Object.hash(id, name, listenerCount, isLive, closed, nowPlaying, lastActiveAt);
 }

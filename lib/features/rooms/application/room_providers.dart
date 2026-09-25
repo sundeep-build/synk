@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/di/core_providers.dart';
 import '../../../core/logging/app_logger.dart';
+import '../../auth/application/session.dart';
 import '../data/room_live_datasource.dart';
 import '../data/room_repository.dart';
 import '../domain/room.dart';
@@ -31,6 +32,17 @@ final liveRoomsProvider = FutureProvider.autoDispose<List<Room>>((ref) async {
   final timer = Timer(const Duration(seconds: 60), link.close);
   ref.onDispose(timer.cancel);
   return ref.watch(roomRepositoryProvider).liveRooms();
+});
+
+/// Rooms you host that haven't been ended (Home → Your rooms), so you can
+/// reopen one after closing the app. One small query, cached for 60s.
+final myRoomsProvider = FutureProvider.autoDispose<List<Room>>((ref) async {
+  final uid = ref.watch(currentProfileProvider.select((p) => p?.uid));
+  if (uid == null) return const [];
+  final link = ref.keepAlive();
+  final timer = Timer(const Duration(seconds: 60), link.close);
+  ref.onDispose(timer.cancel);
+  return ref.watch(roomRepositoryProvider).hostedBy(uid);
 });
 
 /// First few people in a room, for the avatar stacks on Home and Live now.

@@ -88,8 +88,10 @@ class RoomSessionController extends Notifier<RoomSession?> implements TransportD
       ref.read(serverClockProvider);
       final room = await _rooms.get(roomId);
       final isHost = room.hostId == me.uid;
+      if (room.closed) throw const NotFoundException(message: 'This room has ended.');
+      // Everyone left: only its host can bring it back.
       if (!room.isLive && !isHost) {
-        throw const NotFoundException(message: 'This room has ended.');
+        throw const NotFoundException(message: 'This room is paused until its host is back.');
       }
       if (!isHost && !await _live.isMember(roomId, me.uid)) {
         if (await _live.memberCount(roomId) >= room.capacity) throw const RoomFullException();
@@ -97,6 +99,7 @@ class RoomSessionController extends Notifier<RoomSession?> implements TransportD
 
       await _live.join(roomId, me);
       state = RoomSession(room: room, myUid: me.uid);
+      if (isHost) ref.invalidate(myRoomsProvider);
       _audio.delegate = this;
       _subscribe(roomId);
       _syncTimer = Timer.periodic(const Duration(seconds: 1), (_) => _tick());
@@ -134,6 +137,7 @@ class RoomSessionController extends Notifier<RoomSession?> implements TransportD
     } catch (e, st) {
       AppLogger.error('RoomLeave', e, st);
     }
+    if (s.isHost) ref.invalidate(myRoomsProvider);
     await handBack;
   }
 

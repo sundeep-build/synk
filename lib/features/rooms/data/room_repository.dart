@@ -136,6 +136,21 @@ class RoomRepository {
     );
   }
 
+  /// Rooms [uid] hosts that haven't been ended, newest first. A room drops
+  /// out of Live now once everyone has left (or the app was closed), so this
+  /// is how its host finds it again.
+  Future<List<Room>> hostedBy(String uid, {int limit = 10}) async {
+    final snap = await _rooms
+        .where('hostId', isEqualTo: uid)
+        .orderBy('createdAt', descending: true)
+        .limit(limit)
+        .get();
+    return [
+      for (final d in snap.docs)
+        if (Room.fromJson(d.id, d.data()) case final r when !r.closed) r,
+    ];
+  }
+
   /// Directory refresh written by the room leader (see RoomRules.leader).
   Future<void> heartbeat(String roomId, {required int listenerCount, required NowPlayingSummary? nowPlaying}) =>
       _rooms.doc(roomId).update({
@@ -149,10 +164,15 @@ class RoomRepository {
   Future<void> markIdle(String roomId) =>
       _rooms.doc(roomId).update({'listenerCount': 0, 'isLive': false, 'lastActiveAt': FieldValue.serverTimestamp()});
 
-  /// Host ends the room for everyone.
+  /// Host ends the room for everyone, for good.
   Future<void> close(String roomId) async {
     await _rtdb.ref('roomsLive/$roomId/meta/closed').set(true);
-    await markIdle(roomId);
+    await _rooms.doc(roomId).update({
+      'closed': true,
+      'listenerCount': 0,
+      'isLive': false,
+      'lastActiveAt': FieldValue.serverTimestamp(),
+    });
   }
 }
 

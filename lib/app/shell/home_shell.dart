@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/design_system/design_system.dart';
 import '../../features/player/presentation/mini_player.dart';
 import '../../features/rooms/presentation/room_sheets.dart';
+import 'exit_guard.dart';
 
 /// Tab scaffold: content scrolls under a single floating glass "dock" that
 /// holds the mini player and the nav bar (one blur layer for both).
@@ -19,22 +20,32 @@ class HomeShell extends StatelessWidget {
     shell.goBranch(index, initialLocation: index == shell.currentIndex);
   }
 
+  /// Back on another tab's root goes to Home first; on Home it asks to exit.
+  bool _backToHome() {
+    if (shell.currentIndex == 0) return false;
+    shell.goBranch(0);
+    return true;
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      extendBody: true,
-      body: shell,
-      bottomNavigationBar: SafeArea(
-        minimum: const EdgeInsets.fromLTRB(Space.md, 0, Space.md, Space.sm),
-        child: GlassPanel(
-          blur: true,
-          radius: Radii.xlAll,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const MiniPlayer(),
-              _NavRow(current: shell.currentIndex, onTap: _go),
-            ],
+    return ExitGuard(
+      onBack: _backToHome,
+      child: Scaffold(
+        extendBody: true,
+        body: shell,
+        bottomNavigationBar: SafeArea(
+          minimum: const EdgeInsets.fromLTRB(Space.md, 0, Space.md, Space.sm),
+          child: GlassPanel(
+            blur: true,
+            radius: Radii.xlAll,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const MiniPlayer(),
+                _NavRow(current: shell.currentIndex, onTap: _go),
+              ],
+            ),
           ),
         ),
       ),

@@ -36,6 +36,25 @@ class MainActivity : AudioServiceActivity() {
                 }
             }
         }
+        // Huddle calls: keeps the mic alive in the background (HuddleService.kt).
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "club.buildd.synk/huddle").setMethodCallHandler { call, result ->
+            try {
+                when (call.method) {
+                    "start" -> {
+                        HuddleService.start(applicationContext, call.argument<String>("room").orEmpty())
+                        result.success(null)
+                    }
+                    "stop" -> {
+                        HuddleService.stop(applicationContext)
+                        result.success(null)
+                    }
+                    else -> result.notImplemented()
+                }
+            } catch (e: Exception) {
+                // e.g. Android 12+ refusing a start from the background.
+                result.error("huddle_service", e.message, null)
+            }
+        }
     }
 
     private fun pipSupported(): Boolean =

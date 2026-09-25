@@ -89,9 +89,39 @@ q = {"track": track, "by": "alice", "byName": "alice", "at": TS}
 expect("member queues a song as self", call("PUT", f"{R}/queue/q1", q, uid="alice"))
 expect("cannot queue as someone else", call("PUT", f"{R}/queue/q2", {**q, "by": "bob"}, uid="alice"), want=False)
 
+# ── Huddles ────────────────────────────────────────────────────────────────
+H = "huddles/r1"
+hm = lambda name, sid: {"name": name, "emoji": "🎧", "color": 1, "sid": sid, "mic": True, "cam": False, "joinedAt": TS}
+call("PUT", f"{R}/presence/bob", member("bob", "bob"), uid="bob")
+expect("room member joins the huddle as self", call("PUT", f"{H}/members/alice", hm("alice", "sidalice01"), uid="alice"))
+expect("non-member of the room cannot join its huddle", call("PUT", f"{H}/members/eve", hm("eve", "sideve0001"), uid="eve"), want=False)
+expect("cannot join the huddle as someone else", call("PUT", f"{H}/members/bob", hm("bob", "sidbob0001"), uid="alice"), want=False)
+expect("huddle entry needs a session id", call("PUT", f"{H}/members/bob", {**hm("bob", "x"), "sid": "short"}, uid="bob"), want=False)
+expect("second room member joins the huddle", call("PUT", f"{H}/members/bob", hm("bob", "sidbob0001"), uid="bob"))
+expect("member toggles own mic/camera", call("PATCH", f"{H}/members/alice", {"mic": False, "cam": True}, uid="alice"))
+expect("cannot toggle someone else's mic", call("PATCH", f"{H}/members/bob", {"mic": False}, uid="alice"), want=False)
+expect("room member can see who's in the huddle", call("GET", f"{H}/members", uid="alice"))
+expect("outsider cannot see who's in the huddle", call("GET", f"{H}/members", uid="eve"), want=False)
+
+sig = lambda f, to, **kw: {"f": f, "fs": "sid" + f, "ts": "sid" + to, "t": "offer", "sdp": "v=0", "at": TS, **kw}
+expect("huddle member sends an offer to another", call("PUT", f"{H}/signals/bob/s1", sig("alice", "bob"), uid="alice"))
+expect("cannot send a signal as someone else", call("PUT", f"{H}/signals/bob/s2", sig("carol", "bob"), uid="alice"), want=False)
+expect("cannot overwrite a delivered signal", call("PUT", f"{H}/signals/bob/s1", sig("alice", "bob", t="ice"), uid="alice"), want=False)
+expect("unknown signal types are rejected", call("PUT", f"{H}/signals/bob/s3", sig("alice", "bob", t="hack"), uid="alice"), want=False)
+expect("oversized SDP is rejected", call("PUT", f"{H}/signals/bob/s4", sig("alice", "bob", sdp="x" * 20001), uid="alice"), want=False)
+expect("ICE batch as one string", call("PUT", f"{H}/signals/bob/s5", sig("alice", "bob", t="ice", sdp=None, c="[]"), uid="alice"))
+expect("recipient reads own inbox", call("GET", f"{H}/signals/bob", uid="bob"))
+expect("others cannot read someone's inbox", call("GET", f"{H}/signals/bob", uid="alice"), want=False)
+expect("sender cannot delete a delivered signal", call("DELETE", f"{H}/signals/bob/s1", uid="alice"), want=False)
+expect("recipient acks (deletes) handled signals", call("PATCH", f"{H}/signals/bob", {"s1": None, "s5": None}, uid="bob"))
+call("DELETE", f"{H}/members/bob", uid="bob")
+expect("cannot signal someone who left the huddle", call("PUT", f"{H}/signals/bob/s6", sig("alice", "bob"), uid="alice"), want=False)
+expect("leaving clears own membership and inbox together", call("PATCH", H, {"members/alice": None, "signals/alice": None}, uid="alice"))
+
 call("PUT", f"{R}/presence/host", member("host", "host"), uid="host")
 expect("host closes room", call("PUT", f"{R}/meta/closed", True, uid="host"))
 expect("nobody can join a closed room", call("PUT", f"{R}/presence/carol", member("carol", "carol"), uid="carol"), want=False)
+expect("nobody can join the huddle of a closed room", call("PUT", f"{H}/members/alice", hm("alice", "sidalice02"), uid="alice"), want=False)
 
 print()
 if FAILURES:

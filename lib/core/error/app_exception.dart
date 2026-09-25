@@ -95,6 +95,11 @@ final class RoomFullException extends AppException {
   const RoomFullException() : super('This room is full right now.');
 }
 
+/// Microphone or camera access was refused, or is switched off in Settings.
+final class DevicePermissionException extends AppException {
+  const DevicePermissionException(super.message, [super.cause]);
+}
+
 final class UnknownException extends AppException {
   const UnknownException({Object? cause}) : super('Something went wrong. Please try again.', cause);
 }

@@ -24,15 +24,15 @@ abstract final class SynkPalette {
   static const Color online = Color(0xFF3DDC97);
   static const Color danger = Color(0xFFFF4D5E);
 
-  // Dark neutrals (the logo's navy-black)
-  static const Color ink950 = Color(0xFF05050B);
-  static const Color ink900 = Color(0xFF0D0D17);
-  static const Color ink850 = Color(0xFF151523);
-  static const Color ink800 = Color(0xFF1E1E30);
-  static const Color ink600 = Color(0xFF34344A);
-  static const Color ink400 = Color(0xFF8E8EA6);
-  static const Color ink300 = Color(0xFFB3B3C7);
-  static const Color ink50 = Color(0xFFF6F6FB);
+  // Dark neutrals: deep night navy, so the violet and pink glow against it.
+  static const Color ink950 = Color(0xFF0B0C1F); // background
+  static const Color ink900 = Color(0xFF111331); // sheets, dock
+  static const Color ink850 = Color(0xFF181B3B); // cards, panels
+  static const Color ink800 = Color(0xFF22264B); // round buttons, selected rows
+  static const Color ink600 = Color(0xFF363B66);
+  static const Color ink400 = Color(0xFF8C8FB0);
+  static const Color ink300 = Color(0xFFB4B6CF);
+  static const Color ink50 = Color(0xFFF5F5FC);
 
   // Light neutrals
   static const Color paper = Color(0xFFF7F6FB);

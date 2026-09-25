@@ -8,6 +8,14 @@
         { "fieldPath": "isLive", "order": "ASCENDING" },
         { "fieldPath": "listenerCount", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "rooms",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "hostId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": [

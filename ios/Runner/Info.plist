@@ -70,6 +70,10 @@
 	<array>
 		<string>audio</string>
 	</array>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Synk uses your microphone so you can talk with people in a room's huddle.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Synk uses your camera when you turn on video in a huddle.</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>

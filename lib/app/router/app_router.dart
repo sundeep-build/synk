@@ -17,6 +17,7 @@ import '../../features/rooms/presentation/join_screen.dart';
 import '../../features/rooms/presentation/live_rooms_screen.dart';
 import '../../features/rooms/presentation/room_screen.dart';
 import '../../features/search/presentation/search_screen.dart';
+import '../shell/exit_guard.dart';
 import '../shell/home_shell.dart';
 import 'routes.dart';
 
@@ -38,7 +39,10 @@ final routerProvider = Provider<GoRouter>((ref) {
     errorBuilder: (_, _) => const _NotFound(),
     routes: [
       GoRoute(path: Routes.splash, builder: (_, _) => const SplashScreen()),
-      GoRoute(path: Routes.welcome, builder: (_, _) => const WelcomeScreen()),
+      GoRoute(
+        path: Routes.welcome,
+        builder: (_, _) => const ExitGuard(child: WelcomeScreen()),
+      ),
       GoRoute(path: Routes.onboarding, builder: (_, _) => const OnboardingScreen()),
       StatefulShellRoute.indexedStack(
         builder: (_, _, shell) => HomeShell(shell: shell),
