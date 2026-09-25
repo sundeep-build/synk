@@ -30,6 +30,19 @@
           }
         },
 
+        "roster": {
+          ".read": "auth != null",
+          "$uid": {
+            ".write": "auth != null && auth.uid === $uid && (!newData.exists() || (root.child('roomsLive').child($roomId).child('meta').exists() && root.child('roomsLive').child($roomId).child('meta/closed').val() !== true))",
+            ".validate": "newData.hasChildren(['name', 'emoji', 'color', 'lastSeen'])",
+            "name": { ".validate": "newData.isString() && newData.val().length <= 20" },
+            "emoji": { ".validate": "newData.isString() && newData.val().length <= 8" },
+            "color": { ".validate": "newData.isNumber()" },
+            "lastSeen": { ".validate": "newData.isNumber() && newData.val() <= now" },
+            "$other": { ".validate": false }
+          }
+        },
+
         "playback": {
           ".read": "auth != null",
           ".write": "auth != null && root.child('roomsLive').child($roomId).child('presence').child(auth.uid).exists() && (root.child('roomsLive').child($roomId).child('meta/hostId').val() === auth.uid || !root.child('roomsLive').child($roomId).child('presence').child(root.child('roomsLive').child($roomId).child('meta/hostId').val()).exists() || (!data.exists() && newData.child('seq').val() === 1) || (data.exists() && newData.child('seq').val() === data.child('seq').val() + 1))",

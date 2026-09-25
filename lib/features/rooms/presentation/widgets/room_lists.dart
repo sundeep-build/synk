@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/design_system/design_system.dart';
+import '../../../../core/utils/formatters.dart';
 import '../../../catalog/domain/track.dart';
 import '../../../catalog/presentation/track_widgets.dart';
 import '../../../player/presentation/track_actions_sheet.dart';
+import '../../application/room_providers.dart';
 import '../../application/room_session_controller.dart';
 import '../../domain/room.dart';
 import '../../domain/room_live_models.dart';
@@ -131,76 +133,143 @@ class _QueueLabel extends StatelessWidget {
   );
 }
 
-/// Who's in the room, opened from the people chip in the room header.
+/// Who's in the room, and who joined but is away, opened from the people
+/// chip in the room header or the room's ⋮ menu (All members).
 Future<void> showRoomPeople(BuildContext context) => showModalBottomSheet<void>(
   context: context,
   useRootNavigator: true,
   isScrollControlled: true,
   builder: (sheet) => ConstrainedBox(
-    constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(sheet).height * 0.6),
+    constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(sheet).height * 0.7),
     child: const _PeopleSheet(),
   ),
 );
 
-class _PeopleSheet extends ConsumerWidget {
+class _PeopleSheet extends StatelessWidget {
   const _PeopleSheet();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final count = ref.watch(roomSessionProvider.select((s) => s?.members.length ?? 0));
-    return SafeArea(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(Space.gutter, 0, Space.gutter, Space.xs),
-            child: Text('People · $count', style: context.text.titleLarge),
-          ),
-          const Flexible(child: RoomMembersView(shrinkWrap: true)),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) => SafeArea(
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(Space.gutter, 0, Space.gutter, 0),
+          child: Text('People', style: context.text.titleLarge),
+        ),
+        const Flexible(child: RoomMembersView(shrinkWrap: true)),
+      ],
+    ),
+  );
 }
 
+/// Everyone in the room now, in join order, then everyone who joined and
+/// hasn't left on purpose but is away (app closed, offline), most recently
+/// seen first.
 class RoomMembersView extends ConsumerWidget {
   const RoomMembersView({this.shrinkWrap = false, super.key});
 
-  /// Size to the member list (inside a sheet) instead of filling the parent.
+  /// Size to the list (inside a sheet) instead of filling the parent.
   final bool shrinkWrap;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final members = ref.watch(roomSessionProvider.select((s) => s?.members ?? const []));
-    final (hostId, myUid, leader) = ref.watch(
-      roomSessionProvider.select((s) => (s?.room.hostId, s?.myUid, s?.leaderUid)),
+    final members = ref.watch(roomSessionProvider.select((s) => s?.members ?? const <RoomMember>[]));
+    final (roomId, hostId, myUid, leader) = ref.watch(
+      roomSessionProvider.select((s) => (s?.room.id, s?.room.hostId, s?.myUid, s?.leaderUid)),
     );
-    final hostAway = !members.any((m) => m.uid == hostId);
+    final roster = roomId == null ? null : ref.watch(roomRosterProvider(roomId)).value;
+    final here = {for (final m in members) m.uid};
+    final away = [
+      for (final r in roster ?? const <RosterEntry>[])
+        if (!here.contains(r.uid)) r,
+    ]..sort((a, b) => b.lastSeen.compareTo(a.lastSeen));
+    final hostAway = !here.contains(hostId);
+    final now = ref.read(serverClockProvider).nowMs();
+    String name(String uid, String name) => uid == myUid ? '$name (you)' : name;
 
-    return ListView.builder(
+    return ListView(
       shrinkWrap: shrinkWrap,
-      padding: const EdgeInsets.symmetric(vertical: Space.sm),
-      itemCount: members.length,
-      itemBuilder: (_, i) {
-        final m = members[i];
-        final isHost = m.uid == hostId;
-        final acting = hostAway && m.uid == leader;
-        return ListTile(
-          leading: SynkAvatar(emoji: m.emoji, colorIndex: m.color, size: 40, ring: isHost || acting),
-          title: Text(m.uid == myUid ? '${m.name} (you)' : m.name),
-          trailing: isHost || acting
-              ? Container(
-                  padding: const EdgeInsets.symmetric(horizontal: Space.sm, vertical: Space.xs),
-                  decoration: BoxDecoration(color: context.colors.primaryContainer, borderRadius: Radii.pillAll),
-                  child: Text(
-                    isHost ? 'HOST' : 'ACTING HOST',
-                    style: context.text.labelSmall?.copyWith(color: context.colors.onPrimaryContainer),
-                  ),
-                )
-              : null,
-        );
-      },
+      padding: const EdgeInsets.only(bottom: Space.sm),
+      children: [
+        _SectionLabel('In the room · ${members.length}'),
+        for (final m in members)
+          _PersonTile(
+            emoji: m.emoji,
+            color: m.color,
+            name: name(m.uid, m.name),
+            badge: m.uid == hostId
+                ? 'HOST'
+                : hostAway && m.uid == leader
+                ? 'ACTING HOST'
+                : null,
+          ),
+        if (away.isNotEmpty) ...[
+          _SectionLabel('Away · ${away.length}'),
+          for (final r in away)
+            _PersonTile(
+              emoji: r.emoji,
+              color: r.color,
+              name: name(r.uid, r.name),
+              badge: r.uid == hostId ? 'HOST' : null,
+              lastSeen: _lastSeen(r.lastSeen, now),
+            ),
+        ],
+      ],
+    );
+  }
+
+  static String _lastSeen(int lastSeenMs, int nowMs) {
+    final ago = Formatters.timeAgo(
+      DateTime.fromMillisecondsSinceEpoch(lastSeenMs),
+      DateTime.fromMillisecondsSinceEpoch(nowMs),
+    );
+    return ago == 'now' ? 'Last seen just now' : 'Last seen $ago ago';
+  }
+}
+
+class _SectionLabel extends StatelessWidget {
+  const _SectionLabel(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(Space.gutter, Space.lg, Space.gutter, Space.xs),
+    child: Text(text, style: context.text.labelLarge?.copyWith(color: context.synk.textSecondary)),
+  );
+}
+
+/// One person: in the room, or away (dimmed, with when they were last in).
+class _PersonTile extends StatelessWidget {
+  const _PersonTile({required this.emoji, required this.color, required this.name, this.badge, this.lastSeen});
+
+  final String emoji;
+  final int color;
+  final String name;
+  final String? badge;
+
+  /// Set for people who are away.
+  final String? lastSeen;
+
+  @override
+  Widget build(BuildContext context) {
+    final away = lastSeen != null;
+    return ListTile(
+      leading: Opacity(
+        opacity: away ? 0.45 : 1,
+        child: SynkAvatar(emoji: emoji, colorIndex: color, size: 40, ring: badge != null && !away),
+      ),
+      title: Text(name, style: away ? TextStyle(color: context.synk.textSecondary) : null),
+      subtitle: away ? Text(lastSeen!) : null,
+      trailing: badge == null
+          ? null
+          : Container(
+              padding: const EdgeInsets.symmetric(horizontal: Space.sm, vertical: Space.xs),
+              decoration: BoxDecoration(color: context.colors.primaryContainer, borderRadius: Radii.pillAll),
+              child: Text(badge!, style: context.text.labelSmall?.copyWith(color: context.colors.onPrimaryContainer)),
+            ),
     );
   }
 }

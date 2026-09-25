@@ -24,11 +24,53 @@ class SplashScreen extends ConsumerWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     ClipRRect(borderRadius: Radii.lgAll, child: AppLogo(size: 72)),
-                    SizedBox(height: Space.xl),
+                    SizedBox(height: Space.xxl),
+                    _Tagline(),
+                    SizedBox(height: Space.xxl),
                     EqualizerBars(size: 22, bars: 5),
                   ],
                 ),
         ),
+      ),
+    );
+  }
+}
+
+/// "**Listen** together, in sync." beside a brand bar, and what's inside.
+class _Tagline extends StatelessWidget {
+  const _Tagline();
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.synk;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: Space.gutter),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          IntrinsicHeight(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Container(
+                  width: 4,
+                  decoration: BoxDecoration(color: c.brand, borderRadius: Radii.pillAll),
+                ),
+                const SizedBox(width: Space.lg),
+                Flexible(
+                  child: SplitTitle('Listen together,\nin sync.', maxLines: 2, style: context.text.headlineLarge),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: Space.lg),
+          Text(
+            'Music rooms  ·  Live radio  ·  Huddles',
+            style: context.text.bodyMedium?.copyWith(color: c.textSecondary),
+          ),
+        ],
       ),
     );
   }

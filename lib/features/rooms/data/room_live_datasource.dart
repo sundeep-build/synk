@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:firebase_database/firebase_database.dart';
 
 import '../../../core/config/app_config.dart';
+import '../../../core/logging/app_logger.dart';
 import '../../catalog/domain/track.dart';
 import '../../profile/domain/user_profile.dart';
 import '../domain/room_live_models.dart';
@@ -12,7 +15,9 @@ import '../domain/room_playback.dart';
 /// roomsLive/{roomId}/meta          hostId, capacity, closed
 /// roomsLive/{roomId}/playback      the sync anchor (see RoomPlayback)
 /// roomsLive/{roomId}/queue/{push}  upcoming tracks
-/// roomsLive/{roomId}/presence/{uid}
+/// roomsLive/{roomId}/presence/{uid}   who's in it right now
+/// roomsLive/{roomId}/roster/{uid}     everyone who joined and hasn't left
+///                                  on purpose, with when they were last in
 /// roomsLive/{roomId}/skipVotes/{uid} = seq
 /// roomChats/{roomId}/{push}        chat (separate tree: not downloaded
 ///                                  by anyone who only needs playback)
@@ -47,6 +52,10 @@ class RoomLiveDataSource {
       .child('presence')
       .onValue
       .map((e) => _children(e.snapshot, RoomMember.fromJson)..sort((a, b) => a.joinedAt.compareTo(b.joinedAt)));
+
+  /// Everyone who joined and hasn't left on purpose, in the room or not.
+  Stream<List<RosterEntry>> roster(String roomId) =>
+      _live(roomId).child('roster').onValue.map((e) => _children(e.snapshot, RosterEntry.fromJson));
 
   Stream<Map<String, int>> skipVotes(String roomId) => _live(roomId).child('skipVotes').onValue.map((e) {
     final votes = <String, int>{};
@@ -101,12 +110,43 @@ class RoomLiveDataSource {
       'color': me.avatarColor,
       'joinedAt': ServerValue.timestamp,
     });
+    unawaited(_enroll(roomId, me));
   }
 
+  /// Leaving on purpose also takes us off the roster.
   Future<void> leave(String roomId, String uid) async {
     final ref = _live(roomId).child('presence/$uid');
     await ref.onDisconnect().cancel();
     await ref.remove();
+    await _unenroll(roomId, uid);
+  }
+
+  /// Puts us on the roster, and has the server stamp "last seen" when our
+  /// connection drops. Best effort: the room works without it.
+  Future<void> _enroll(String roomId, UserProfile me) async {
+    final ref = _live(roomId).child('roster/${me.uid}');
+    try {
+      await ref.set({
+        'name': me.username,
+        'emoji': me.avatarEmoji,
+        'color': me.avatarColor,
+        'lastSeen': ServerValue.timestamp,
+      });
+      // Only once the entry exists: on its own, a stamp would be half an entry.
+      await ref.child('lastSeen').onDisconnect().set(ServerValue.timestamp);
+    } catch (e, st) {
+      AppLogger.error('RoomRoster', e, st);
+    }
+  }
+
+  Future<void> _unenroll(String roomId, String uid) async {
+    final ref = _live(roomId).child('roster/$uid');
+    try {
+      await ref.child('lastSeen').onDisconnect().cancel();
+      await ref.remove();
+    } catch (e, st) {
+      AppLogger.error('RoomRoster', e, st);
+    }
   }
 
   // ── Chat & reactions ───────────────────────────────────────────────────

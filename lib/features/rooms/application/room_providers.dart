@@ -215,6 +215,12 @@ class RoomChatController extends Notifier<List<ChatMessage>> {
   }
 }
 
+/// Everyone who joined a room and hasn't left it on purpose, in it or not.
+/// Listened to only while the people sheet is open.
+final roomRosterProvider = StreamProvider.autoDispose.family<List<RosterEntry>, String>(
+  (ref, roomId) => ref.watch(roomLiveProvider).roster(roomId),
+);
+
 /// Emoji bursts sent after the screen opened (never replays old ones).
 final roomReactionsProvider = StreamProvider.autoDispose.family<Reaction, String>((ref, roomId) {
   // Re-opened after a dropped connection, like the chat.

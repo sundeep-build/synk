@@ -289,6 +289,7 @@ class _RoomHeader extends ConsumerWidget {
             tooltip: 'Room options',
             icon: const Icon(Icons.more_vert_rounded),
             onSelected: (v) => switch (v) {
+              'people' => showRoomPeople(context),
               'share' => _share(),
               'code' => _copyCode(context),
               'leave' => _leave(context, ref, endForAll: false),
@@ -296,6 +297,7 @@ class _RoomHeader extends ConsumerWidget {
               _ => null,
             },
             itemBuilder: (_) => [
+              _menuItem('people', Icons.groups_rounded, 'All members'),
               _menuItem('share', Icons.ios_share_rounded, 'Invite friends'),
               _menuItem('code', Icons.copy_rounded, 'Copy room code'),
               const PopupMenuDivider(),

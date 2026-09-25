@@ -126,6 +126,41 @@ class RoomMember {
   int get hashCode => Object.hash(uid, name, emoji);
 }
 
+/// Someone who joined a room and hasn't left it on purpose, whether they're
+/// in it right now or not (`roomsLive/{id}/roster`).
+@immutable
+class RosterEntry {
+  const RosterEntry({
+    required this.uid,
+    required this.name,
+    required this.emoji,
+    required this.color,
+    required this.lastSeen,
+  });
+
+  final String uid;
+  final String name;
+  final String emoji;
+  final int color;
+
+  /// Server time (ms) they last joined, or their connection last dropped.
+  final int lastSeen;
+
+  /// Null for anything without a name (never a whole entry).
+  static RosterEntry? fromJson(String uid, Object? raw) {
+    if (raw is! Map<Object?, Object?>) return null;
+    final name = raw.str('name');
+    if (name.isEmpty) return null;
+    return RosterEntry(
+      uid: uid,
+      name: name,
+      emoji: raw.str('emoji', '🎧'),
+      color: raw.integer('color'),
+      lastSeen: raw.integer('lastSeen'),
+    );
+  }
+}
+
 @immutable
 class Reaction {
   const Reaction({required this.id, required this.uid, required this.emoji});
