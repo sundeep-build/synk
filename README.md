@@ -66,9 +66,12 @@ flutter run --dart-define-from-file=env/dev.json    # or use the "Synk (dev)" VS
 ### 2. Run
 
 ```bash
-flutter run --dart-define-from-file=env/dev.json
-flutter build appbundle --dart-define-from-file=env/prod.json --obfuscate --split-debug-info=build/symbols
+flutter run --dart-define-from-file=env/dev.json   # or F5 in VS Code (adds the keys itself)
+bash scripts/build_release.sh                       # signed Play build, see "Build and upload" below
 ```
+
+Always pass `env/dev.json`. A plain `flutter run` builds **without** the YouTube key, so videos, search and autoplay
+are off (Home says so in debug builds).
 
 ### Local backend (optional)
 
@@ -77,6 +80,35 @@ firebase emulators:start --project demo-synk   # Auth, Firestore, RTDB, and the 
 ```
 
 ---
+
+## Build and upload to Play Console (internal testing)
+
+One-time setup: the upload key (`android/key.properties`, via `bash scripts/setup_signing.sh`) and `env/prod.json`.
+Both are git-ignored; see [docs/RELEASING.md](docs/RELEASING.md) for how to create them.
+
+Every release:
+
+1. **Bump the version** in `pubspec.yaml`. The number after `+` is the versionCode. Play rejects an upload unless it's
+   higher than the last one, e.g. `1.1.0+2` → `1.1.1+3`.
+2. **Deploy the backend rules** if anything in `firebase/` changed: `firebase deploy --only firestore,database`.
+3. **Build** the signed, obfuscated bundle with the production keys. The script runs the tests first:
+
+   ```bash
+   bash scripts/build_release.sh
+   # offline, or not logged in to the Firebase CLI:
+   SKIP_CRASHLYTICS_UPLOAD=1 bash scripts/build_release.sh
+   ```
+
+   Output: `build/app/outputs/bundle/release/app-release.aab`. Keep `release-symbols/<version>`, which turns obfuscated
+   crash traces back into readable ones.
+4. **Upload**: Play Console → *Synk* → *Test and release* → *Testing* → *Internal testing* → *Create new release* →
+   upload the `.aab` → release notes → *Next* → *Save* → *Start rollout*.
+5. **Testers**: *Internal testing* → *Testers* → copy the link. Each tester opts in once, and later builds arrive
+   through the Play Store.
+
+Play Console blocks a rollout until the *App content* forms match the build. Builds with huddles need the microphone
+foreground-service declaration and a Data safety update for microphone and camera; see
+[docs/RELEASING.md](docs/RELEASING.md).
 
 ## What's in the MVP
 

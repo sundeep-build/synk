@@ -64,8 +64,11 @@ works.
 
 1. Bump the version in `pubspec.yaml`. The number after `+` is the versionCode,
    and it must go up with every upload:
-   `version: 1.0.0+1` → `1.0.1+2` → …
-2. Build:
+   `version: 1.1.0+2` → `1.1.1+3` → …
+2. If anything in `firebase/` changed, deploy it first. Builds rely on the rules
+   and indexes being live:
+   `firebase deploy --only firestore,database`
+3. Build:
 
    ```sh
    bash scripts/build_release.sh
@@ -74,11 +77,12 @@ works.
    ```
 
    Output: `build/app/outputs/bundle/release/app-release.aab`.
-3. Upload the obfuscated Dart symbols, so Crashlytics traces are readable:
+4. The script also uploads the obfuscated Dart symbols, so Crashlytics traces are
+   readable. If it couldn't, or you skipped it, upload them by hand:
 
    ```sh
    firebase crashlytics:symbols:upload \
-     --app=1:1048701967035:android:6a3c9b630b2458da80279e build/symbols/<version>
+     --app=1:1048701967035:android:6a3c9b630b2458da80279e release-symbols/<version>
    ```
 
 ## Play Console: internal testing (fastest, up to 100 testers)
@@ -106,9 +110,22 @@ works.
      sign-in), usernames, chat messages, and Analytics/Crashlytics (app
      interactions, crash logs, diagnostics). Data is encrypted in transit, and
      users can delete their account (Profile → Delete account).
-   - **Foreground service permissions**: `FOREGROUND_SERVICE_MEDIA_PLAYBACK`,
-     used to keep radio playing in the background. Include a short screen
-     recording if asked.
+   - **Foreground service permissions**: declare both types, with a short
+     screen recording of each:
+     - `FOREGROUND_SERVICE_MEDIA_PLAYBACK`: keeps radio playing in the
+       background.
+     - `FOREGROUND_SERVICE_MICROPHONE`: keeps a huddle (voice call in a room)
+       running while the app is in the background. The user starts it, and an
+       "In a huddle" notification shows while it runs.
+   - **Data safety** for huddles: the app uses the **microphone** (voice) and
+     the **camera** (optional video) only while you're in a huddle. Streams go
+     directly between the phones in the call. Nothing is recorded or stored,
+     and none of it passes through our servers. Declare *Audio: voice* and
+     *Photos and videos: videos* as shared with other users in the call, not
+     stored, and optional.
+   - **Permissions** new in 1.1.0: `RECORD_AUDIO`, `CAMERA` and
+     `BLUETOOTH_CONNECT` (headset audio in huddles). Play shows these to users
+     on the store page automatically.
 
 ## Going to production later
 

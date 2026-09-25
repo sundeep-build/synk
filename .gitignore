@@ -51,3 +51,6 @@ app.*.map.json
 # Local build secrets (copy env/dev.example.json → env/dev.json)
 env/*.json
 !env/*.example.json
+
+# Obfuscation symbols per release (outside build/, so `flutter clean` keeps them)
+/release-symbols/

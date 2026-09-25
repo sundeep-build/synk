@@ -24,20 +24,23 @@ flutter pub get >/dev/null
 flutter test --reporter failures-only
 flutter build appbundle --release \
   --dart-define-from-file=env/prod.json \
-  --obfuscate --split-debug-info=build/symbols/"$version"
+  --obfuscate --split-debug-info=release-symbols/"$version"
 
 aab=build/app/outputs/bundle/release/app-release.aab
 echo
 echo "✓ $aab ($(du -h "$aab" | cut -f1)) — this is the file to upload"
 
 # Optional: readable crash traces in Crashlytics. Never fails the build.
+# SKIP_CRASHLYTICS_UPLOAD=1 skips it (offline, or not logged in to Firebase).
 app_id=$(grep -A6 'android = FirebaseOptions' lib/firebase_options.dart | sed -nE "s/.*appId: '([^']+)'.*/\1/p")
-if command -v firebase >/dev/null 2>&1 && [[ -n "$app_id" ]]; then
+if [[ "${SKIP_CRASHLYTICS_UPLOAD:-}" == 1 ]]; then
+  echo "→ Crashlytics symbol upload skipped (SKIP_CRASHLYTICS_UPLOAD=1)."
+elif command -v firebase >/dev/null 2>&1 && [[ -n "$app_id" ]]; then
   echo "→ Uploading crash symbols to Crashlytics (optional)…"
-  if firebase crashlytics:symbols:upload --app="$app_id" "build/symbols/$version" >/dev/null 2>&1; then
+  if firebase crashlytics:symbols:upload --app="$app_id" "release-symbols/$version" >/dev/null 2>&1; then
     echo "  ✓ Dart symbols"
   else
-    echo "  ⚠ Dart symbols not uploaded — retry: firebase crashlytics:symbols:upload --app=$app_id build/symbols/$version"
+    echo "  ⚠ Dart symbols not uploaded — retry: firebase crashlytics:symbols:upload --app=$app_id release-symbols/$version"
   fi
   res=build/app/generated/res/injectCrashlyticsMappingFileIdRelease/values/com_google_firebase_crashlytics_mappingfileid.xml
   map=build/app/outputs/mapping/release/mapping.txt
@@ -47,6 +50,6 @@ if command -v firebase >/dev/null 2>&1 && [[ -n "$app_id" ]]; then
     echo "  ⚠ Android mapping not uploaded — retry: firebase crashlytics:mappingfile:upload --app=$app_id --resource-file=$res $map"
   fi
 fi
-echo "  Keep build/symbols/$version — it turns obfuscated crash traces back into readable ones."
+echo "  Keep release-symbols/$version — it turns obfuscated crash traces back into readable ones."
 echo
 echo "Next: Play Console → Internal testing → Create new release → upload the .aab"
