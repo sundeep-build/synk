@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../synk_colors.dart';
 import '../tokens.dart';
+import 'cartoon_avatar.dart';
 
-/// Generated avatar: emoji on a solid identity colour. Zero uploads, zero storage
-/// cost, identical on every device — ideal for the free tier.
+/// Generated avatar: a cartoon character (`c:<n>`, see [CartoonAvatar]) or an
+/// emoji, on a solid identity colour. Zero uploads, zero storage cost,
+/// identical on every device — ideal for the free tier.
 class SynkAvatar extends StatelessWidget {
   const SynkAvatar({required this.emoji, required this.colorIndex, this.size = 40, this.ring = false, super.key});
 
@@ -17,13 +19,16 @@ class SynkAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final avatar = Container(
-      width: size,
-      height: size,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(shape: BoxShape.circle, color: SynkPalette.identityColor(colorIndex)),
-      child: Text(emoji, style: TextStyle(fontSize: size * 0.46, height: 1)),
-    );
+    final cartoon = CartoonAvatar.indexOf(emoji);
+    final Widget avatar = cartoon != null
+        ? CartoonAvatar(index: cartoon, background: SynkPalette.identityColor(colorIndex), size: size)
+        : Container(
+            width: size,
+            height: size,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(shape: BoxShape.circle, color: SynkPalette.identityColor(colorIndex)),
+            child: Text(emoji, style: TextStyle(fontSize: size * 0.46, height: 1)),
+          );
     if (!ring) return avatar;
     return Container(
       padding: const EdgeInsets.all(2),

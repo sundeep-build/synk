@@ -42,10 +42,12 @@ class YouTubeEngine implements MediaEngine {
   final StreamController<bool> _visibleCtrl = StreamController.broadcast();
   final StreamController<bool> _floatingCtrl = StreamController.broadcast();
   final StreamController<bool> _wantsPlayCtrl = StreamController.broadcast();
+  final StreamController<bool> _floatEligibleCtrl = StreamController.broadcast();
 
   int _primaryStages = 0;
   bool _floating = false;
   bool _wantsPlay = false;
+  bool _floatEligible = false;
 
   /// The PiP window's stage. While it's up, stages mounting in the (offstage)
   /// app park underneath it instead of taking the video away.
@@ -71,11 +73,20 @@ class YouTubeEngine implements MediaEngine {
   bool get wantsPlay => _wantsPlay;
   Stream<bool> get wantsPlayStream => _wantsPlayCtrl.stream;
 
+  /// The floating card would show this video if no full-size player were on
+  /// screen: it's playing, or already floating (a pause keeps the card up).
+  /// Unlike [wantsFloating] this ignores full-size players, so the card can
+  /// stand by while the room is open and take the player the moment the room
+  /// closes, with no reload in between.
+  bool get floatEligible => _floatEligible;
+  Stream<bool> get floatEligibleStream => _floatEligibleCtrl.stream;
+
   /// ✕ on the floating card. A later play brings it back.
   void dismissFloating() {
     if (!_floating) return;
     _floating = false;
     if (!_floatingCtrl.isClosed) _floatingCtrl.add(false);
+    _syncFloatEligible();
   }
 
   /// Emits when [wantsFloating] changes. Delivered asynchronously, so stages
@@ -272,7 +283,15 @@ class YouTubeEngine implements MediaEngine {
       _floating = next;
       if (!_floatingCtrl.isClosed) _floatingCtrl.add(next);
     }
+    _syncFloatEligible();
     _syncWantsPlay();
+  }
+
+  void _syncFloatEligible() {
+    final next = _track != null && (_wantPlay || _floating);
+    if (next == _floatEligible) return;
+    _floatEligible = next;
+    if (!_floatEligibleCtrl.isClosed) _floatEligibleCtrl.add(next);
   }
 
   void _syncWantsPlay() {
@@ -318,6 +337,7 @@ class YouTubeEngine implements MediaEngine {
     await Future.wait([
       _playingCtrl.close(),
       _positionCtrl.close(),
+      _floatEligibleCtrl.close(),
       _completedCtrl.close(),
       _errorCtrl.close(),
       _visibleCtrl.close(),

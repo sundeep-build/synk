@@ -89,8 +89,8 @@ firebase emulators:start --project demo-synk   # Auth, Firestore, RTDB, and the 
 | App | Android back: other tabs go to Home first, then "Exit Synk?" (Exit leaves the room/huddle and stops playback) |
 | Discover | Live rooms, trending music videos for your country, radio for your vibe, radio near you, genre pages (videos + radio), search for videos and stations |
 | Library | Likes, playlists (create, rename, delete, swipe to remove), recently played |
-| Player | Radio: background playback with lock-screen and notification controls. YouTube: official on-screen player (pauses when the app is minimised, as YouTube requires). Mini player, full player, "Listen together" to turn solo listening into a room |
-| Profile | Edit avatar, name and vibes, theme (dark/light/auto), link a guest account, sign out, **delete account** (required by both app stores) |
+| Player | Radio: background playback with lock-screen and notification controls. YouTube: official on-screen player (pauses when the app is minimised, as YouTube requires). Mini player, full player, "Listen together" to turn solo listening into a room. Floating video: drag anywhere, springs to a side, tuck it to an edge (pauses — YouTube never plays unseen) where your avatar waits; your avatar dances in its title bar while music plays |
+| Profile | Cartoon character avatars (pop & jazz crew) or emoji, name and vibes, stats, recently played, theme (dark/light/auto), link a guest account, sign out, **delete account** (required by both app stores) |
 
 ## Free-tier budget
 

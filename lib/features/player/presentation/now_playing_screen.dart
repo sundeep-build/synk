@@ -13,6 +13,7 @@ import '../../rooms/presentation/room_sheets.dart';
 import '../application/player_providers.dart';
 import 'player_progress.dart';
 import 'track_actions_sheet.dart';
+import 'video_slot.dart';
 import 'youtube_stage.dart';
 
 /// Full-screen solo player: round cover (or the video), actions, waveform,
@@ -74,7 +75,7 @@ class NowPlayingScreen extends ConsumerWidget {
                 const Spacer(),
                 if (track.isYouTube) ...[
                   // One stage for the whole screen: next/previous only swap the video.
-                  const YouTubeStage(key: ValueKey('now-playing-stage')),
+                  const VideoSlot(stage: YouTubeStage()),
                   const SizedBox(height: Space.sm),
                   const VideoForegroundNote(),
                 ] else

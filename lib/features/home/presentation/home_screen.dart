@@ -409,6 +409,8 @@ class _LiveRoomsCarouselState extends ConsumerState<_LiveRoomsCarousel> {
   @override
   Widget build(BuildContext context) {
     final rooms = ref.watch(liveRoomsProvider);
+    final myUid = ref.watch(currentProfileProvider.select((p) => p?.uid));
+    final hereId = ref.watch(roomSessionProvider.select((s) => s?.room.id));
     return rooms.when(
       skipLoadingOnRefresh: true,
       loading: () => const Padding(
@@ -416,7 +418,8 @@ class _LiveRoomsCarouselState extends ConsumerState<_LiveRoomsCarousel> {
         child: Skeleton(height: _height, radius: Radii.xlAll),
       ),
       error: (e, _) => ErrorState(error: e, onRetry: () => ref.invalidate(liveRoomsProvider)),
-      data: (list) {
+      data: (all) {
+        final list = othersLiveRooms(all, myUid: myUid, currentRoomId: hereId);
         if (list.isEmpty) return const _NoRoomsCard();
         return Column(
           children: [

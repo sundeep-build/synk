@@ -50,6 +50,13 @@ final myRoomsProvider = FutureProvider.autoDispose<List<Room>>((ref) async {
   }
 });
 
+/// Live now lists other people's rooms only: yours are under Your rooms, and
+/// the one you're in is already on your screen.
+List<Room> othersLiveRooms(Iterable<Room> rooms, {required String? myUid, required String? currentRoomId}) => [
+  for (final r in rooms)
+    if (r.hostId != myUid && r.id != currentRoomId) r,
+];
+
 /// First few people in a room, for the avatar stacks on Home and Live now.
 /// One small indexed read per room, cached for 60s like the directory.
 final roomListenersPreviewProvider = FutureProvider.autoDispose.family<List<RoomMember>, String>((ref, roomId) {

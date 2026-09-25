@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -30,7 +31,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   int _step = 0;
   _NameStatus _status = _NameStatus.idle;
   String? _nameError;
-  String _emoji = SynkPalette.avatarEmojis.first;
+  // Start everyone on a random cartoon character (they can change it).
+  String _emoji = CartoonAvatar.code(Random().nextInt(CartoonAvatar.count));
   int _color = 0;
   final Set<String> _vibes = {};
   bool _saving = false;

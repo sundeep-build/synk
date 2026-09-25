@@ -38,10 +38,12 @@ final videoVisibleProvider = StreamProvider<bool>((ref) async* {
 });
 
 /// Whether the floating video player should be up (a video was minimised).
-final floatingVideoProvider = StreamProvider<bool>((ref) async* {
+/// The floating card should stand by for the current video (see
+/// YouTubeEngine.floatEligible).
+final videoFloatEligibleProvider = StreamProvider<bool>((ref) async* {
   final youtube = ref.watch(playerHubProvider).youtube;
-  yield youtube.wantsFloating;
-  yield* youtube.floatingStream;
+  yield youtube.floatEligible;
+  yield* youtube.floatEligibleStream;
 });
 
 /// A video is meant to be playing (intent, so buffering/handover don't flap it).

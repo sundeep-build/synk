@@ -7,6 +7,7 @@ import '../../../core/design_system/design_system.dart';
 import '../../rooms/application/room_session_controller.dart';
 import '../application/player_providers.dart';
 import '../data/picture_in_picture.dart';
+import 'video_slot.dart';
 import 'youtube_stage.dart';
 
 /// A video is meant to be playing, so leaving the app should go to
@@ -35,15 +36,28 @@ class _PipHostState extends ConsumerState<PipHost> {
   late final List<StreamSubscription<Object?>> _subs;
   late bool _inPip = _pip.inPip;
 
+  /// The PiP window wants the shared player. Flipped in the mode-change event
+  /// itself (see VideoSlot), so on the way back the room takes the player
+  /// in the same frame the PiP window drops it: no reload either way.
+  late final _claim = ValueNotifier(_inPip && _isVideo);
+
+  bool get _isVideo => ref.read(currentTrackProvider).value?.isYouTube ?? false;
+
   @override
   void initState() {
     super.initState();
     _subs = [
-      _pip.modeChanges.listen((v) => setState(() => _inPip = v)),
+      _pip.modeChanges.listen((v) {
+        _claim.value = v && _isVideo;
+        setState(() => _inPip = v);
+      }),
       // Closing the window means "stop", not "resume next time I open the app".
       _pip.dismissals.listen((_) => _stopVideo()),
     ];
-    ref.listenManual(pipEligibleProvider, (_, armed) => _pip.setAutoEnter(armed), fireImmediately: true);
+    ref
+      ..listenManual(pipEligibleProvider, (_, armed) => _pip.setAutoEnter(armed), fireImmediately: true)
+      // The video ended or radio took over while in PiP: let the player go.
+      ..listenManual(currentTrackProvider, (_, t) => _claim.value = _inPip && (t.value?.isYouTube ?? false));
   }
 
   void _stopVideo() {
@@ -58,6 +72,7 @@ class _PipHostState extends ConsumerState<PipHost> {
     for (final s in _subs) {
       unawaited(s.cancel());
     }
+    _claim.dispose();
     super.dispose();
   }
 
@@ -77,18 +92,16 @@ class _PipHostState extends ConsumerState<PipHost> {
           Overlay.wrap(
             child: ColoredBox(
               color: Colors.black,
-              child: (track?.isYouTube ?? false)
-                  // Pinned: stages the offstage app mounts meanwhile can't take the video.
-                  ? const YouTubeStage(
-                      key: ValueKey('pip-stage'),
-                      floating: true,
-                      fill: true,
-                      pinned: true,
-                      radius: BorderRadius.zero,
-                    )
-                  // The video ended or switched to radio while in PiP: say
-                  // what's on instead of showing a dead player.
-                  : _PipNowPlaying(title: track?.title, artworkUrl: track?.artworkUrl, seed: track?.seed ?? 0),
+              child: VideoSlot(
+                priority: VideoSlot.pip,
+                claim: _claim,
+                stage: const YouTubeStage(floating: true, fill: true, radius: BorderRadius.zero),
+                // No video (it ended, or radio took over while in PiP): say
+                // what's on instead of showing a dead player.
+                builder: (_, player) =>
+                    player ??
+                    _PipNowPlaying(title: track?.title, artworkUrl: track?.artworkUrl, seed: track?.seed ?? 0),
+              ),
             ),
           ),
       ],

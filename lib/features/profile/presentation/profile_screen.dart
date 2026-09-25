@@ -2,14 +2,20 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../app/router/routes.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/design_system/design_system.dart';
 import '../../../core/di/core_providers.dart';
+import '../../../core/utils/formatters.dart';
 import '../../auth/application/session.dart';
 import '../../catalog/domain/genres.dart';
+import '../../catalog/presentation/track_widgets.dart';
 import '../../library/application/library_providers.dart';
+import '../../player/application/play_actions.dart';
 import '../../player/application/player_providers.dart';
 import '../../rooms/application/room_providers.dart';
 import '../../rooms/application/room_session_controller.dart';
@@ -62,6 +68,13 @@ class ProfileScreen extends ConsumerWidget {
     }
   }
 
+  void _edit(BuildContext context, UserProfile profile) => showModalBottomSheet<void>(
+    context: context,
+    useRootNavigator: true,
+    isScrollControlled: true,
+    builder: (_) => _EditProfileSheet(profile: profile),
+  );
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final profile = ref.watch(currentProfileProvider);
@@ -71,6 +84,8 @@ class ProfileScreen extends ConsumerWidget {
     final playlists = ref.watch(playlistsProvider).value?.length ?? 0;
     final themeMode = ref.watch(themeModeProvider);
     final rooms = ref.watch(myRoomsProvider).value?.length ?? 0;
+    final recent = ref.watch(recentTracksProvider);
+    final character = CartoonAvatar.indexOf(profile.avatarEmoji);
     final c = context.synk;
 
     return Scaffold(
@@ -81,43 +96,108 @@ class ProfileScreen extends ConsumerWidget {
             SafeArea(
               bottom: false,
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(Space.gutter, Space.xl, Space.gutter, 0),
-                child: Column(
-                  children: [
-                    SynkAvatar(emoji: profile.avatarEmoji, colorIndex: profile.avatarColor, size: 104, ring: true),
-                    const SizedBox(height: Space.lg),
-                    Text(profile.displayName, style: context.text.headlineMedium),
-                    Text('@${profile.username}', style: context.text.bodyMedium?.copyWith(color: c.textSecondary)),
-                    const SizedBox(height: Space.lg),
-                    PillButton(
-                      label: 'Edit profile',
-                      icon: Icons.edit_rounded,
-                      height: 38,
-                      onPressed: () => showModalBottomSheet<void>(
-                        context: context,
-                        useRootNavigator: true,
-                        isScrollControlled: true,
-                        builder: (_) => _EditProfileSheet(profile: profile),
-                      ),
-                    ),
-                    const SizedBox(height: Space.xl),
-                    _Panel(
-                      child: IntrinsicHeight(
-                        child: Row(
-                          children: [
-                            _Stat(value: '$likes', label: 'Liked'),
-                            VerticalDivider(color: c.glassBorder, width: 1),
-                            _Stat(value: '$playlists', label: 'Playlists'),
-                            VerticalDivider(color: c.glassBorder, width: 1),
-                            _Stat(value: '$rooms', label: 'Your rooms'),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+                padding: const EdgeInsets.fromLTRB(Space.gutter, Space.md, Space.gutter, 0),
+                child: _Hero(profile: profile),
               ),
             ),
+            const SizedBox(height: Space.md),
+            Text(profile.displayName, textAlign: TextAlign.center, style: context.text.headlineMedium),
+            const SizedBox(height: 2),
+            Text(
+              '@${profile.username}',
+              textAlign: TextAlign.center,
+              style: context.text.bodyMedium?.copyWith(color: c.textSecondary),
+            ),
+            if (character != null) ...[
+              const SizedBox(height: Space.sm),
+              Center(
+                child: _Tag(icon: Icons.music_note_rounded, label: CartoonAvatar.names[character]),
+              ),
+            ],
+            const SizedBox(height: Space.lg),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                PillButton(
+                  label: 'Edit profile',
+                  icon: Icons.edit_rounded,
+                  height: 40,
+                  onPressed: () => _edit(context, profile),
+                ),
+                const SizedBox(width: Space.sm),
+                PillButton(
+                  label: 'Share',
+                  icon: Icons.ios_share_rounded,
+                  height: 40,
+                  onPressed: () => SharePlus.instance.share(
+                    ShareParams(
+                      text:
+                          'Come listen with me on ${AppConfig.appName} 🎧 I\'m @${profile.username} — '
+                          'join my rooms and we\'ll hear every beat together.',
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: Space.xl),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: Space.gutter),
+              child: Row(
+                children: [
+                  _StatTile(
+                    icon: Icons.favorite_rounded,
+                    color: c.accent,
+                    value: likes,
+                    label: 'Liked',
+                    onTap: () => context.go(Routes.library),
+                  ),
+                  const SizedBox(width: Space.md),
+                  _StatTile(
+                    icon: Icons.queue_music_rounded,
+                    color: context.colors.tertiary,
+                    value: playlists,
+                    label: 'Playlists',
+                    onTap: () => context.go(Routes.library),
+                  ),
+                  const SizedBox(width: Space.md),
+                  _StatTile(
+                    icon: Icons.sensors_rounded,
+                    color: context.colors.primary,
+                    value: rooms,
+                    label: 'Your rooms',
+                    onTap: () => context.go(Routes.home),
+                  ),
+                ],
+              ),
+            ),
+            SectionHeader('Your vibes', accent: c.accent, action: 'Edit', onAction: () => _edit(context, profile)),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: Space.gutter),
+              child: profile.vibes.isEmpty
+                  ? Text('Pick a few vibes and we\'ll tune Home to them.', style: context.text.bodySmall)
+                  : Wrap(
+                      spacing: Space.sm,
+                      runSpacing: Space.sm,
+                      children: [
+                        for (final label in profile.vibes)
+                          if (Vibes.byLabel(label) case final v?) _VibeChip(vibe: v),
+                      ],
+                    ),
+            ),
+            if (recent.isNotEmpty) ...[
+              const SectionHeader('Recently played'),
+              SizedBox(
+                height: TrackCard.railHeight(context),
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: Space.gutter),
+                  itemCount: recent.length.clamp(0, 12),
+                  separatorBuilder: (_, _) => const SizedBox(width: Space.md),
+                  itemBuilder: (_, i) =>
+                      TrackCard(track: recent[i], onTap: () => playTrackFromList(context, ref, recent, i)),
+                ),
+              ),
+            ],
             if (isGuest)
               Padding(
                 padding: const EdgeInsets.fromLTRB(Space.gutter, Space.xl, Space.gutter, 0),
@@ -220,6 +300,211 @@ class ProfileScreen extends ConsumerWidget {
   }
 }
 
+/// Violet banner with painted records, notes and equaliser bars; the avatar
+/// sits on its bottom edge.
+class _Hero extends StatelessWidget {
+  const _Hero({required this.profile});
+
+  final UserProfile profile;
+
+  static const double _banner = 132;
+  static const double _avatar = 112;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.synk;
+    return SizedBox(
+      height: _banner + _avatar / 2,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned(
+            left: 0,
+            right: 0,
+            top: 0,
+            height: _banner,
+            child: ClipRRect(
+              borderRadius: Radii.xlAll,
+              child: RepaintBoundary(
+                child: CustomPaint(
+                  painter: _BannerPainter(base: c.brand, accent: c.accent),
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: Center(
+              child: Container(
+                padding: const EdgeInsets.all(5),
+                decoration: BoxDecoration(color: c.background, shape: BoxShape.circle),
+                child: SynkAvatar(emoji: profile.avatarEmoji, colorIndex: profile.avatarColor, size: _avatar),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BannerPainter extends CustomPainter {
+  _BannerPainter({required this.base, required this.accent});
+
+  final Color base;
+  final Color accent;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.drawRect(Offset.zero & size, Paint()..color = base);
+    final soft = Paint()..color = Colors.white.withValues(alpha: 0.08);
+    final ring = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.2
+      ..color = Colors.white.withValues(alpha: 0.12);
+    // Two records peeking in from the corners.
+    for (final (center, r) in [
+      (Offset(size.width * 0.08, size.height * 0.95), size.height * 0.7),
+      (Offset(size.width * 0.95, size.height * 0.1), size.height * 0.55),
+    ]) {
+      canvas.drawCircle(center, r, soft);
+      for (var f = 0.35; f < 1; f += 0.16) {
+        canvas.drawCircle(center, r * f, ring);
+      }
+      canvas.drawCircle(center, r * 0.22, Paint()..color = accent.withValues(alpha: 0.55));
+    }
+    // Equaliser bars along the bottom right.
+    final bar = Paint()..color = Colors.white.withValues(alpha: 0.18);
+    const heights = [0.3, 0.55, 0.4, 0.75, 0.5, 0.35, 0.6];
+    for (var i = 0; i < heights.length; i++) {
+      final h = size.height * heights[i] * 0.6;
+      final x = size.width * 0.66 + i * 9;
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(Rect.fromLTWH(x, size.height - h - 10, 5, h), const Radius.circular(3)),
+        bar,
+      );
+    }
+    // A few notes.
+    final note = Paint()..color = Colors.white.withValues(alpha: 0.35);
+    for (final (x, y, s) in [(0.3, 0.3, 1.0), (0.42, 0.62, 0.7), (0.58, 0.25, 0.85)]) {
+      _note(canvas, Offset(size.width * x, size.height * y), 7 * s, note);
+    }
+  }
+
+  void _note(Canvas canvas, Offset at, double r, Paint paint) {
+    canvas
+      ..drawOval(Rect.fromCenter(center: at, width: r * 2.2, height: r * 1.6), paint)
+      ..drawRect(Rect.fromLTWH(at.dx + r * 0.85, at.dy - r * 3.2, r * 0.3, r * 3.2), paint)
+      ..drawRect(Rect.fromLTWH(at.dx + r * 0.85, at.dy - r * 3.2, r * 1.3, r * 0.45), paint);
+  }
+
+  @override
+  bool shouldRepaint(_BannerPainter old) => old.base != base || old.accent != accent;
+}
+
+/// Small rounded tag (the avatar's character).
+class _Tag extends StatelessWidget {
+  const _Tag({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: Space.md, vertical: 5),
+    decoration: BoxDecoration(
+      color: context.synk.surfaceOverlay,
+      borderRadius: Radii.pillAll,
+      border: Border.all(color: context.synk.glassBorder),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 14, color: context.colors.tertiary),
+        const SizedBox(width: 6),
+        Text(label, style: context.text.labelMedium),
+      ],
+    ),
+  );
+}
+
+/// One number with a coloured icon disc; taps through to where it lives.
+class _StatTile extends StatelessWidget {
+  const _StatTile({
+    required this.icon,
+    required this.color,
+    required this.value,
+    required this.label,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final Color color;
+  final int value;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.synk;
+    return Expanded(
+      child: Pressable(
+        onTap: onTap,
+        semanticLabel: '$value $label',
+        child: Container(
+          padding: const EdgeInsets.all(Space.md),
+          decoration: BoxDecoration(
+            color: c.surface,
+            borderRadius: Radii.lgAll,
+            border: Border.all(color: c.glassBorder),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(color: color.withValues(alpha: 0.16), shape: BoxShape.circle),
+                child: Icon(icon, size: 18, color: color),
+              ),
+              const SizedBox(height: Space.sm),
+              Text(Formatters.compact(value), style: context.text.headlineSmall),
+              Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: context.text.bodySmall),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A vibe as a solid colour chip with its icon.
+class _VibeChip extends StatelessWidget {
+  const _VibeChip({required this.vibe});
+
+  final Vibe vibe;
+
+  @override
+  Widget build(BuildContext context) => Pressable(
+    onTap: () => context.push(Routes.genre(vibe.label)),
+    semanticLabel: '${vibe.label} vibe',
+    child: Container(
+      padding: const EdgeInsets.fromLTRB(Space.sm, 6, Space.md, 6),
+      decoration: BoxDecoration(color: SynkPalette.identityColor(vibe.colorIndex), borderRadius: Radii.pillAll),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(vibe.icon, size: 16, color: Colors.white),
+          const SizedBox(width: 6),
+          Text(vibe.label, style: context.text.labelMedium?.copyWith(color: Colors.white)),
+        ],
+      ),
+    ),
+  );
+}
+
 /// Rounded surface for grouped content.
 class _Panel extends StatelessWidget {
   const _Panel({required this.child, this.padding = const EdgeInsets.symmetric(vertical: Space.lg)});
@@ -276,23 +561,6 @@ class _SettingsRow extends StatelessWidget {
       onTap: onTap,
     );
   }
-}
-
-class _Stat extends StatelessWidget {
-  const _Stat({required this.value, required this.label});
-
-  final String value;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) => Expanded(
-    child: Column(
-      children: [
-        Text(value, style: context.text.headlineSmall),
-        Text(label, style: context.text.bodySmall),
-      ],
-    ),
-  );
 }
 
 class _EditProfileSheet extends ConsumerStatefulWidget {

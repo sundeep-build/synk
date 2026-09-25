@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/design_system/design_system.dart';
+import '../../auth/application/session.dart';
 import '../application/room_providers.dart';
+import '../application/room_session_controller.dart';
 import 'room_sheets.dart';
 import 'widgets/room_card.dart';
 
@@ -43,6 +45,11 @@ class _LiveRoomsScreenState extends ConsumerState<LiveRoomsScreen> {
   @override
   Widget build(BuildContext context) {
     final s = ref.watch(liveRoomsPagerProvider);
+    final visible = othersLiveRooms(
+      s.rooms,
+      myUid: ref.watch(currentProfileProvider.select((p) => p?.uid)),
+      currentRoomId: ref.watch(roomSessionProvider.select((r) => r?.room.id)),
+    );
     final pager = ref.read(liveRoomsPagerProvider.notifier);
     final bottom = MediaQuery.paddingOf(context).bottom + Space.xl;
 
@@ -54,9 +61,9 @@ class _LiveRoomsScreenState extends ConsumerState<LiveRoomsScreen> {
     );
 
     final Widget body;
-    if (s.rooms.isEmpty && s.error != null) {
+    if (visible.isEmpty && s.error != null) {
       body = message(ErrorState(error: s.error!, onRetry: pager.loadMore));
-    } else if (s.rooms.isEmpty && !s.hasMore) {
+    } else if (visible.isEmpty && !s.hasMore && !s.loading) {
       body = message(
         EmptyState(
           icon: Icons.nightlife_rounded,
@@ -82,10 +89,10 @@ class _LiveRoomsScreenState extends ConsumerState<LiveRoomsScreen> {
         controller: _scroll,
         physics: const AlwaysScrollableScrollPhysics(),
         padding: EdgeInsets.fromLTRB(Space.gutter, Space.sm, Space.gutter, bottom),
-        itemCount: s.rooms.length + 1,
+        itemCount: visible.length + 1,
         separatorBuilder: (_, _) => const SizedBox(height: Space.md),
         itemBuilder: (_, i) =>
-            i < s.rooms.length ? RoomTile(key: ValueKey(s.rooms[i].id), room: s.rooms[i]) : _Footer(state: s),
+            i < visible.length ? RoomTile(key: ValueKey(visible[i].id), room: visible[i]) : _Footer(state: s),
       );
     }
 

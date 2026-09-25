@@ -89,6 +89,24 @@ void main() {
     expect(engine.wantsFloating, isFalse);
   });
 
+  test('the floating card stands by while the room plays a video, so it can take it over mid-play', () async {
+    await engine.load(_video);
+    engine.addPrimaryStage(); // the room is open
+    expect(engine.wantsFloating, isFalse, reason: 'not shown while the room shows it');
+    expect(engine.floatEligible, isTrue, reason: 'but ready to take over');
+    await engine.pause();
+    expect(engine.floatEligible, isFalse, reason: 'minimising a paused video pops nothing up');
+    await engine.play();
+    engine.removePrimaryStage(); // minimised: floating now
+    await engine.pause();
+    expect(engine.floatEligible, isTrue, reason: 'a pause keeps the card');
+    engine.dismissFloating();
+    expect(engine.floatEligible, isFalse, reason: '✕ lets it go');
+    await engine.play();
+    await engine.clear();
+    expect(engine.floatEligible, isFalse);
+  });
+
   test('play intent (arms PiP) follows play/pause, not buffering', () async {
     expect(engine.wantsPlay, isFalse);
     await engine.load(_video);

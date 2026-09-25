@@ -13,6 +13,7 @@ import '../../../core/utils/formatters.dart';
 import '../application/room_providers.dart';
 import '../application/room_session_controller.dart';
 import '../domain/room.dart';
+import 'add_music_sheet.dart';
 import 'widgets/huddle_bar.dart';
 import 'widgets/reaction_layer.dart';
 import 'widgets/room_chat.dart';
@@ -135,21 +136,28 @@ class _RoomBodyState extends ConsumerState<_RoomBody> {
                       child: RoomNowPlaying(compact: compactPlayer),
                     ),
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(Space.gutter, Space.md, Space.gutter, 0),
-                      child: GlassPanel(
-                        color: context.synk.surface,
-                        radius: Radii.pillAll,
-                        padding: const EdgeInsets.all(4),
-                        child: TabBar(
-                          tabs: [
-                            // Single-line labels: counts grow ("Queue · 42") and must not wrap.
-                            for (final label in ['Chat', queueCount == 0 ? 'Queue' : 'Queue · $queueCount'])
-                              Tab(
-                                height: 36,
-                                child: Text(label, maxLines: 1, overflow: TextOverflow.fade, softWrap: false),
+                      padding: const EdgeInsets.fromLTRB(Space.gutter, Space.md, Space.gutter, Space.xs),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: GlassPanel(
+                              color: context.synk.surface,
+                              radius: Radii.pillAll,
+                              padding: const EdgeInsets.all(4),
+                              child: TabBar(
+                                tabs: [
+                                  // Single-line labels: counts grow ("Queue · 42") and must not wrap.
+                                  for (final label in ['Chat', queueCount == 0 ? 'Queue' : 'Queue · $queueCount'])
+                                    Tab(
+                                      height: 36,
+                                      child: Text(label, maxLines: 1, overflow: TextOverflow.fade, softWrap: false),
+                                    ),
+                                ],
                               ),
-                          ],
-                        ),
+                            ),
+                          ),
+                          _AddMusicButton(radio: room.mode == RoomMode.radio),
+                        ],
                       ),
                     ),
                     Expanded(
@@ -168,7 +176,7 @@ class _RoomBodyState extends ConsumerState<_RoomBody> {
                 ),
                 Positioned(
                   right: 0,
-                  bottom: 120,
+                  bottom: 80,
                   width: 120,
                   height: 360,
                   child: ReactionLayer(key: _reactions, roomId: room.id, myUid: myUid),
@@ -312,6 +320,31 @@ PopupMenuItem<String> _menuItem(String value, IconData icon, String label, {Colo
     ],
   ),
 );
+
+/// "+" beside the tabs: add a song (or change station, for whoever controls
+/// a radio room).
+class _AddMusicButton extends ConsumerWidget {
+  const _AddMusicButton({required this.radio});
+
+  final bool radio;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final canControl = ref.watch(roomSessionProvider.select((s) => s?.canControl ?? false));
+    if (radio && !canControl) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(left: Space.sm),
+      child: CircleIconButton(
+        icon: radio ? Icons.radio_rounded : Icons.add_rounded,
+        tooltip: radio ? 'Change station' : 'Add a song',
+        size: 46,
+        fill: context.synk.brand,
+        foreground: context.synk.onBrand,
+        onPressed: () => showAddMusicSheet(context, radio: radio),
+      ),
+    );
+  }
+}
 
 /// Live head-count; tap to see who's here.
 class _PeopleChip extends StatelessWidget {

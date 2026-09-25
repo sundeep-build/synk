@@ -54,6 +54,8 @@ class RoomChatView extends ConsumerWidget {
   }
 }
 
+/// A chat bubble: yours on the right in brand violet; everyone else's on the
+/// left with their avatar and name (once per run of messages).
 class _ChatLine extends StatelessWidget {
   const _ChatLine({required this.message, required this.mine, required this.grouped});
 
@@ -61,29 +63,57 @@ class _ChatLine extends StatelessWidget {
   final bool mine;
   final bool grouped;
 
+  static const _round = Radius.circular(18);
+  static const _tail = Radius.circular(6);
+
   @override
   Widget build(BuildContext context) {
-    final nameColor = context.synk.identityText(message.color);
+    final c = context.synk;
+    final bubble = Container(
+      constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.72),
+      padding: const EdgeInsets.symmetric(horizontal: Space.md, vertical: Space.sm),
+      decoration: BoxDecoration(
+        color: mine ? c.brand : c.surfaceRaised,
+        border: mine ? null : Border.all(color: c.glassBorder),
+        borderRadius: BorderRadius.only(
+          topLeft: !mine && !grouped ? _tail : _round,
+          topRight: mine && !grouped ? _tail : _round,
+          bottomLeft: _round,
+          bottomRight: _round,
+        ),
+      ),
+      child: Text(message.text, style: context.text.bodyMedium?.copyWith(color: mine ? c.onBrand : c.textPrimary)),
+    );
+    final top = EdgeInsets.only(top: grouped ? 3 : Space.md);
+    if (mine) {
+      return Padding(
+        padding: top,
+        child: Align(alignment: Alignment.centerRight, child: bubble),
+      );
+    }
     return Padding(
-      padding: EdgeInsets.only(top: grouped ? 2 : Space.md),
+      padding: top,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: 32,
-            child: grouped ? null : SynkAvatar(emoji: message.emoji, colorIndex: message.color, size: 32),
+            width: 30,
+            child: grouped ? null : SynkAvatar(emoji: message.emoji, colorIndex: message.color, size: 30),
           ),
-          const SizedBox(width: Space.md),
-          Expanded(
+          const SizedBox(width: Space.sm),
+          Flexible(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 if (!grouped)
-                  Text(
-                    mine ? 'you' : message.name,
-                    style: context.text.labelMedium?.copyWith(color: mine ? context.colors.primary : nameColor),
+                  Padding(
+                    padding: const EdgeInsets.only(left: Space.xs, bottom: 2),
+                    child: Text(
+                      message.name,
+                      style: context.text.labelSmall?.copyWith(color: c.identityText(message.color)),
+                    ),
                   ),
-                Text(message.text, style: context.text.bodyMedium),
+                bubble,
               ],
             ),
           ),
@@ -193,6 +223,9 @@ class _RoomComposerState extends ConsumerState<RoomComposer> {
   DateTime _lastReaction = DateTime.fromMillisecondsSinceEpoch(0);
   bool _sending = false;
 
+  /// The reaction tray above the field (folded away to save chat space).
+  bool _tray = false;
+
   @override
   void dispose() {
     _text.dispose();
@@ -252,34 +285,58 @@ class _RoomComposerState extends ConsumerState<RoomComposer> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                for (final e in Reaction.allowed)
-                  Semantics(
-                    button: true,
-                    label: 'React $e',
-                    child: InkResponse(
-                      onTap: () => _react(e),
-                      radius: 24,
-                      child: Padding(
-                        padding: const EdgeInsets.all(Space.sm),
-                        child: Text(e, style: const TextStyle(fontSize: 24)),
+            AnimatedSize(
+              duration: Motion.fast,
+              curve: Motion.standard,
+              child: !_tray
+                  ? const SizedBox(width: double.infinity)
+                  : Padding(
+                      padding: const EdgeInsets.only(bottom: Space.sm),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: Space.xs),
+                        decoration: BoxDecoration(
+                          color: c.surface,
+                          borderRadius: Radii.pillAll,
+                          border: Border.all(color: c.glassBorder),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceAround,
+                          children: [
+                            for (final e in Reaction.allowed)
+                              Semantics(
+                                button: true,
+                                label: 'React $e',
+                                child: InkResponse(
+                                  onTap: () => _react(e),
+                                  radius: 24,
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(Space.sm),
+                                    child: Text(e, style: const TextStyle(fontSize: 24)),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-              ],
             ),
-            const SizedBox(height: Space.xs),
             Row(
               children: [
+                CircleIconButton(
+                  icon: _tray ? Icons.close_rounded : Icons.emoji_emotions_outlined,
+                  tooltip: _tray ? 'Hide reactions' : 'React',
+                  size: 42,
+                  onPressed: () => setState(() => _tray = !_tray),
+                ),
                 if (!widget.radio)
                   IconButton(
                     tooltip: 'Dedicate a song',
                     icon: const Icon(Icons.card_giftcard_rounded),
-                    color: context.synk.accent,
+                    color: c.accent,
                     onPressed: _dedicate,
-                  ),
+                  )
+                else
+                  const SizedBox(width: Space.sm),
                 Expanded(
                   child: TextField(
                     controller: _text,
@@ -289,16 +346,22 @@ class _RoomComposerState extends ConsumerState<RoomComposer> {
                     textCapitalization: TextCapitalization.sentences,
                     textInputAction: TextInputAction.send,
                     onSubmitted: (_) => _send(),
+                    onTap: () {
+                      if (_tray) setState(() => _tray = false);
+                    },
                     onTapOutside: (_) => FocusScope.of(context).unfocus(),
                     decoration: InputDecoration(
                       hintText: 'Say something…',
                       counterText: '',
                       isDense: true,
                       filled: true,
-                      fillColor: c.surfaceRaised,
+                      fillColor: c.surface,
                       contentPadding: const EdgeInsets.symmetric(horizontal: Space.lg, vertical: Space.md),
                       border: const OutlineInputBorder(borderRadius: Radii.pillAll, borderSide: BorderSide.none),
-                      enabledBorder: const OutlineInputBorder(borderRadius: Radii.pillAll, borderSide: BorderSide.none),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: Radii.pillAll,
+                        borderSide: BorderSide(color: c.glassBorder),
+                      ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: Radii.pillAll,
                         borderSide: BorderSide(color: context.colors.primary),
@@ -311,6 +374,7 @@ class _RoomComposerState extends ConsumerState<RoomComposer> {
                   valueListenable: _text,
                   builder: (_, value, _) => IconButton.filled(
                     tooltip: 'Send',
+                    style: IconButton.styleFrom(backgroundColor: c.brand, foregroundColor: c.onBrand),
                     onPressed: value.text.trim().isEmpty || _sending ? null : _send,
                     icon: const Icon(Icons.arrow_upward_rounded),
                   ),

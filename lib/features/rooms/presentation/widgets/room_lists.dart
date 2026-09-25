@@ -113,9 +113,19 @@ class _QueueLabel extends StatelessWidget {
     padding: const EdgeInsets.fromLTRB(Space.gutter, Space.lg, Space.gutter, Space.xs),
     child: Semantics(
       header: true,
-      child: Text(
-        label.toUpperCase(),
-        style: context.text.labelSmall?.copyWith(color: context.synk.textMuted, letterSpacing: 1.2),
+      child: Row(
+        children: [
+          Container(
+            width: 3,
+            height: 12,
+            decoration: BoxDecoration(color: context.colors.tertiary, borderRadius: Radii.pillAll),
+          ),
+          const SizedBox(width: Space.sm),
+          Text(
+            label.toUpperCase(),
+            style: context.text.labelSmall?.copyWith(color: context.synk.textSecondary, letterSpacing: 1.4),
+          ),
+        ],
       ),
     ),
   );

@@ -30,6 +30,10 @@ accents: violet for primary actions and the selected tab, pink for selections an
 playing". The only gradient is the logo itself. Montserrat throughout. Section titles pair a heavy first word with a
 light rest (`SectionHeader`, `SplitTitle`) beside a short accent bar.
 
+Avatars are cartoon characters drawn in code (`CartoonAvatar`: six pop, six jazz; no image assets) or an emoji,
+on an identity colour. A character is stored as `c:<n>` in the existing avatar field, which every surface already
+syncs (profile, presence, chat, huddle, room host), so it needed no schema or rules change.
+
 Building blocks: `CircleIconButton` / `CircleBackButton` (round raised icons in headers), `PlayStateButton` (track
 rows), `PillButton` (Play/Playing, Room code), `SegmentIndicator` (carousels), `DuotoneCover` (artwork tinted one
 colour, used on room tickets), `GridBackdrop` (faint studio grid), `BrandWordmark`. Screens use these and theme styles
@@ -50,6 +54,15 @@ care about the source. YouTube compliance is structural: a player exists only wh
 the background. Search results are filtered to embeddable, non-live videos, so users never land on "Video
 unavailable". Rooms use seek-only drift correction for videos (YouTube has no fine playback-rate control) and
 re-sync as soon as a stage comes back on screen.
+
+**One player, moved between screens.** The app never has more than one YouTube player. Screens place it through a
+`VideoSlot` (room, Now Playing, the floating card, the Android PiP window), and a `VideoStageRegistry` gives it to the
+highest-priority slot that wants it (PiP > a full screen > the floating card). Every owner builds it under the same
+`GlobalKey`, so changing owner *moves* the playing WebView instead of creating a new one: minimising the room hands the
+video to the floating card mid-play, with no reload. The timing matters. Slots let go at event time (a route starting
+to close, a PiP callback, an engine stream event), so the old and the new owner rebuild in the same frame. A slot that
+claims while mounting takes over one frame later, so two slots never hold the player at once. Covered by
+`test/widget/video_slot_test.dart`.
 
 **Dependency rule.** `presentation → application → data → domain`. Features share code through
 `core/` or through another feature's `application` providers, never through its widgets.

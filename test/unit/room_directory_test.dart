@@ -1,11 +1,19 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:synk/features/rooms/application/room_providers.dart';
 import 'package:synk/features/rooms/domain/room.dart';
 
-Room _room({bool isLive = true, bool closed = false, int listeners = 3, DateTime? lastActiveAt}) => Room(
-  id: 'r1',
+Room _room({
+  String id = 'r1',
+  String hostId = 'host',
+  bool isLive = true,
+  bool closed = false,
+  int listeners = 3,
+  DateTime? lastActiveAt,
+}) => Room(
+  id: id,
   name: 'Room',
   code: 'ABC234',
-  hostId: 'host',
+  hostId: hostId,
   hostName: 'host',
   hostEmoji: '🎧',
   hostColor: 0,
@@ -35,5 +43,15 @@ void main() {
     final base = {'name': 'Room', 'code': 'ABC234', 'hostId': 'host', 'visibility': 'public', 'mode': 'music'};
     expect(Room.fromJson('r1', {...base, 'closed': true}).closed, isTrue);
     expect(Room.fromJson('r1', base).closed, isFalse);
+  });
+
+  test("Live now leaves out rooms you host and the one you're in", () {
+    final rooms = [
+      _room(id: 'mine', hostId: 'me'),
+      _room(id: 'here', hostId: 'friend'),
+      _room(id: 'other', hostId: 'friend'),
+    ];
+    expect(othersLiveRooms(rooms, myUid: 'me', currentRoomId: 'here').map((r) => r.id), ['other']);
+    expect(othersLiveRooms(rooms, myUid: null, currentRoomId: null).length, 3, reason: 'signed out: everything');
   });
 }

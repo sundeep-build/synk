@@ -13,8 +13,9 @@ import '../data/youtube_engine.dart';
 /// playing. Mounting this is what allows a video to play; unmounting it closes
 /// the player, so playback can never continue off screen (YouTube API policy).
 ///
-/// Keep it at one position in the widget tree while it should stay alive —
-/// remounting reloads the player.
+/// There is only ever one: screens place it through a `VideoSlot`, which
+/// moves this same player (by GlobalKey) between the room, Now Playing, the
+/// floating card and the PiP window. Rebuilding it would reload the video.
 class YouTubeStage extends ConsumerStatefulWidget {
   const YouTubeStage({
     this.height,
@@ -70,6 +71,15 @@ class _YouTubeStageState extends ConsumerState<YouTubeStage> with WidgetsBinding
     if (!widget.floating) _engine.addPrimaryStage();
   }
 
+  /// Moved to another slot: a full-size slot counts as a primary stage (the
+  /// floating card then steps aside), a floating one doesn't.
+  @override
+  void didUpdateWidget(YouTubeStage old) {
+    super.didUpdateWidget(old);
+    if (old.floating == widget.floating) return;
+    widget.floating ? _engine.removePrimaryStage() : _engine.addPrimaryStage();
+  }
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     // `inactive` (e.g. notification shade) keeps playing; background pauses.
@@ -86,28 +96,43 @@ class _YouTubeStageState extends ConsumerState<YouTubeStage> with WidgetsBinding
   }
 
   @override
+  Widget build(BuildContext context) => YouTubeStageFrame(
+    height: widget.height,
+    radius: widget.radius,
+    fill: widget.fill,
+    builder: (width, height) => YoutubePlayer(
+      controller: _controller,
+      aspectRatio: width / height,
+      backgroundColor: Colors.black,
+      autoFullScreen: false,
+      enableFullScreenOnVerticalDrag: false,
+    ),
+  );
+}
+
+/// The stage's box (16:9 of the width, at least 200 high, rounded). Also the
+/// black placeholder a slot shows while another slot has the player, so the
+/// layout doesn't jump when the player moves.
+class YouTubeStageFrame extends StatelessWidget {
+  const YouTubeStageFrame({this.height, this.radius = Radii.lgAll, this.fill = false, this.builder, super.key});
+
+  final double? height;
+  final BorderRadius radius;
+  final bool fill;
+  final Widget Function(double width, double height)? builder;
+
+  @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth;
-        final height = widget.fill
-            ? constraints.maxHeight
-            : math.max(widget.height ?? width * 9 / 16, YouTubeStage.minSize);
+        final h = fill ? constraints.maxHeight : math.max(height ?? width * 9 / 16, YouTubeStage.minSize);
         return ClipRRect(
-          borderRadius: widget.radius,
+          borderRadius: radius,
           child: SizedBox(
             width: width,
-            height: height,
-            child: ColoredBox(
-              color: Colors.black,
-              child: YoutubePlayer(
-                controller: _controller,
-                aspectRatio: width / height,
-                backgroundColor: Colors.black,
-                autoFullScreen: false,
-                enableFullScreenOnVerticalDrag: false,
-              ),
-            ),
+            height: h,
+            child: ColoredBox(color: Colors.black, child: builder?.call(width, h)),
           ),
         );
       },

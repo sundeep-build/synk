@@ -11,7 +11,7 @@ import '../application/player_providers.dart';
 /// Progress bar isolated in its own widget: it's the only thing that rebuilds
 /// at position-tick rate, so the rest of the screen stays still.
 class PlayerProgress extends ConsumerStatefulWidget {
-  const PlayerProgress({required this.track, this.onSeek, this.waveform = false, super.key});
+  const PlayerProgress({required this.track, this.onSeek, this.waveform = false, this.slim = false, super.key});
 
   final Track track;
 
@@ -21,6 +21,10 @@ class PlayerProgress extends ConsumerStatefulWidget {
   /// A waveform of bars instead of a slider (Now Playing). The bars are drawn
   /// from the track id, not decoded audio: a stable look that costs nothing.
   final bool waveform;
+
+  /// One thin line with the times at either end (the room, where height is
+  /// precious).
+  final bool slim;
 
   @override
   ConsumerState<PlayerProgress> createState() => _PlayerProgressState();
@@ -79,7 +83,7 @@ class _PlayerProgressState extends ConsumerState<PlayerProgress> {
                   borderRadius: Radii.pillAll,
                   child: LinearProgressIndicator(
                     value: value,
-                    minHeight: 4,
+                    minHeight: widget.slim ? 3 : 4,
                     backgroundColor: c.glassBorder,
                     color: context.colors.tertiary,
                   ),
@@ -93,6 +97,29 @@ class _PlayerProgressState extends ConsumerState<PlayerProgress> {
                   setState(() => _drag = null);
                 },
               ),
+      );
+    }
+
+    if (widget.slim) {
+      return Semantics(
+        slider: true,
+        value: '${Formatters.duration(shown)} of ${Formatters.duration(total)}',
+        child: Row(
+          children: [
+            Text(Formatters.duration(shown), style: labels),
+            const SizedBox(width: Space.sm),
+            Expanded(
+              child: SliderTheme(
+                data: SliderTheme.of(
+                  context,
+                ).copyWith(trackHeight: 3, thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5)),
+                child: bar,
+              ),
+            ),
+            const SizedBox(width: Space.sm),
+            Text(Formatters.duration(total), style: labels),
+          ],
+        ),
       );
     }
 

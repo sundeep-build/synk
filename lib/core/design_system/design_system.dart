@@ -5,6 +5,8 @@ export 'tokens.dart';
 export 'widgets/artwork.dart';
 export 'widgets/aurora_background.dart';
 export 'widgets/brand_widgets.dart';
+export 'widgets/cartoon_avatar.dart';
+export 'widgets/dancing_avatar.dart';
 export 'widgets/feedback_views.dart';
 export 'widgets/glass_panel.dart';
 export 'widgets/live_indicators.dart';
