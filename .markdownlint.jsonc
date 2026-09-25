@@ -1,0 +1,8 @@
+// markdownlint config (used by the VS Code markdownlint extension and markdownlint-cli2).
+{
+  "default": true,
+  // Match the Dart code's 120-column formatter; tables and code blocks may run longer.
+  "MD013": { "line_length": 120, "tables": false, "code_blocks": false },
+  // Tables use "| a | b |" with a space on both sides of every pipe.
+  "MD060": { "style": "compact" }
+}

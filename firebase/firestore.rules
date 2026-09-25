@@ -1,0 +1,134 @@
+rules_version = '2';
+
+// Synk — Firestore security rules.
+// There is no server code in the MVP (Spark/free tier), so these rules ARE the
+// backend's business logic. Keep them in sync with lib/core/utils/validators.dart
+// and the repositories under lib/features/*/data.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isUser(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function onlyKeys(keys) {
+      return incoming().keys().hasOnly(keys);
+    }
+
+    function changedOnly(keys) {
+      return incoming().diff(resource.data).affectedKeys().hasOnly(keys);
+    }
+
+    function validUsername(name) {
+      return name is string && name.matches('^[a-z0-9_.]{3,20}$');
+    }
+
+    function docPath(collection, id) {
+      return /databases/$(database)/documents/$(collection)/$(id);
+    }
+
+    // ── Username reservations: one doc per name, created once by its owner ──
+    match /usernames/{name} {
+      allow get: if signedIn();
+      allow list: if false;
+      allow create: if signedIn()
+        && validUsername(name)
+        && onlyKeys(['uid', 'createdAt'])
+        && incoming().uid == request.auth.uid
+        // Must be created in the same transaction as the profile using it.
+        && getAfter(docPath('users', request.auth.uid)).data.username == name;
+      allow update: if false;
+      allow delete: if signedIn() && resource.data.uid == request.auth.uid;
+    }
+
+    // ── Profiles ──
+    match /users/{uid} {
+      function validProfile(d) {
+        return d.displayName is string && d.displayName.size() > 0 && d.displayName.size() <= 30
+          && d.avatarEmoji is string && d.avatarEmoji.size() <= 8
+          && d.avatarColor is int && d.avatarColor >= 0 && d.avatarColor < 8
+          && d.vibes is list && d.vibes.size() <= 20;
+      }
+
+      allow read: if signedIn();
+      allow create: if isUser(uid)
+        && onlyKeys(['username', 'displayName', 'avatarEmoji', 'avatarColor', 'vibes', 'isPro', 'createdAt', 'updatedAt'])
+        && validUsername(incoming().username)
+        && incoming().isPro == false // Pro is granted server-side only
+        && validProfile(incoming())
+        && getAfter(docPath('usernames', incoming().username)).data.uid == uid;
+      allow update: if isUser(uid)
+        && changedOnly(['displayName', 'avatarEmoji', 'avatarColor', 'vibes', 'updatedAt'])
+        && validProfile(incoming());
+      allow delete: if isUser(uid);
+
+      match /likes/{trackId} {
+        allow read, delete: if isUser(uid);
+        allow create, update: if isUser(uid)
+          && onlyKeys(['track', 'likedAt'])
+          && incoming().track is map;
+      }
+
+      match /playlists/{playlistId} {
+        allow read, delete: if isUser(uid);
+        allow create, update: if isUser(uid)
+          && onlyKeys(['name', 'tracks', 'createdAt', 'updatedAt'])
+          && incoming().name is string && incoming().name.size() > 0 && incoming().name.size() <= 60
+          && incoming().tracks is list && incoming().tracks.size() <= 200;
+      }
+    }
+
+    // ── Room codes → room ids ──
+    match /roomCodes/{code} {
+      allow get: if signedIn();
+      allow list: if false;
+      allow create: if signedIn()
+        && code.matches('^[A-HJKMNP-Z2-9]{6}$')
+        && onlyKeys(['roomId', 'createdBy'])
+        && incoming().createdBy == request.auth.uid
+        && getAfter(docPath('rooms', incoming().roomId)).data.code == code;
+      allow update, delete: if false;
+    }
+
+    // ── Room directory ──
+    match /rooms/{roomId} {
+      function validRoom(d) {
+        return d.name is string && d.name.size() >= 2 && d.name.size() <= 40
+          && d.code is string
+          && d.visibility in ['public', 'private']
+          && d.mode in ['music', 'radio']
+          && d.capacity is int && d.capacity >= 2 && d.capacity <= 50;
+      }
+
+      allow get: if signedIn();
+      // Listing only ever returns public rooms (queries must filter on it),
+      // so private rooms are reachable by code alone.
+      allow list: if signedIn() && resource.data.visibility == 'public';
+      allow create: if signedIn()
+        && onlyKeys(['name', 'code', 'hostId', 'hostName', 'hostEmoji', 'hostColor', 'visibility',
+                     'mode', 'capacity', 'vibe', 'coverColor', 'listenerCount', 'isLive',
+                     'nowPlaying', 'createdAt', 'lastActiveAt'])
+        && incoming().hostId == request.auth.uid
+        && validRoom(incoming())
+        && incoming().listenerCount == 0
+        && incoming().isLive == true;
+      // Directory heartbeat by the room leader (see RoomRules.leader): only
+      // live-status fields, bounded, server-timestamped.
+      allow update: if signedIn()
+        && changedOnly(['listenerCount', 'isLive', 'nowPlaying', 'lastActiveAt'])
+        && incoming().listenerCount is int
+        && incoming().listenerCount >= 0
+        && incoming().listenerCount <= resource.data.capacity
+        && incoming().lastActiveAt == request.time;
+      allow delete: if signedIn() && resource.data.hostId == request.auth.uid;
+    }
+  }
+}

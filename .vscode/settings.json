@@ -1,0 +1,5 @@
+{
+  // Every VS Code run (F5, the "Run | Debug" links above main(), the Flutter
+  // sidebar) gets the dev keys, so YouTube never silently turns off.
+  "dart.flutterRunAdditionalArgs": ["--dart-define-from-file=env/dev.json"]
+}

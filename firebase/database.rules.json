@@ -1,0 +1,114 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+
+    "roomsLive": {
+      "$roomId": {
+        "meta": {
+          ".read": "auth != null",
+          ".write": "auth != null && ((!data.exists() && newData.child('hostId').val() === auth.uid) || data.child('hostId').val() === auth.uid)",
+          ".validate": "newData.hasChildren(['hostId', 'capacity'])",
+          "hostId": { ".validate": "newData.isString() && (!data.exists() || newData.val() === data.val())" },
+          "capacity": { ".validate": "newData.isNumber() && newData.val() >= 2 && newData.val() <= 50" },
+          "closed": { ".validate": "newData.isBoolean()" },
+          "createdAt": { ".validate": "newData.isNumber()" },
+          "$other": { ".validate": false }
+        },
+
+        "presence": {
+          ".read": "auth != null",
+          ".indexOn": ["joinedAt"],
+          "$uid": {
+            ".write": "auth != null && auth.uid === $uid && root.child('roomsLive').child($roomId).child('meta').exists() && (!newData.exists() || root.child('roomsLive').child($roomId).child('meta/closed').val() !== true)",
+            ".validate": "newData.hasChildren(['name', 'emoji', 'color', 'joinedAt'])",
+            "name": { ".validate": "newData.isString() && newData.val().length <= 20" },
+            "emoji": { ".validate": "newData.isString() && newData.val().length <= 8" },
+            "color": { ".validate": "newData.isNumber()" },
+            "joinedAt": { ".validate": "newData.val() === now" },
+            "$other": { ".validate": false }
+          }
+        },
+
+        "playback": {
+          ".read": "auth != null",
+          ".write": "auth != null && root.child('roomsLive').child($roomId).child('presence').child(auth.uid).exists() && (root.child('roomsLive').child($roomId).child('meta/hostId').val() === auth.uid || !root.child('roomsLive').child($roomId).child('presence').child(root.child('roomsLive').child($roomId).child('meta/hostId').val()).exists() || (!data.exists() && newData.child('seq').val() === 1) || (data.exists() && newData.child('seq').val() === data.child('seq').val() + 1))",
+          ".validate": "newData.hasChildren(['status', 'positionMs', 'updatedAt', 'seq']) && newData.child('updatedAt').val() === now",
+          "track": { ".validate": "newData.hasChildren(['id', 'src', 't', 'a', 'u'])" },
+          "status": { ".validate": "newData.isString() && newData.val().matches(/^(playing|paused|idle)$/)" },
+          "positionMs": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+          "updatedAt": { ".validate": "newData.isNumber()" },
+          "seq": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+          "by": { ".validate": "newData.val() === auth.uid" },
+          "qid": { ".validate": "newData.isString()" },
+          "$other": { ".validate": false }
+        },
+
+        "queue": {
+          ".read": "auth != null",
+          "$itemId": {
+            ".write": "auth != null && root.child('roomsLive').child($roomId).child('presence').child(auth.uid).exists() && (data.exists() ? !newData.exists() : newData.child('by').val() === auth.uid)",
+            ".validate": "newData.hasChildren(['track', 'by', 'byName', 'at'])",
+            "track": { ".validate": "newData.hasChildren(['id', 'src', 't', 'a', 'u'])" },
+            "by": { ".validate": "newData.isString()" },
+            "byName": { ".validate": "newData.isString() && newData.val().length <= 20" },
+            "at": { ".validate": "newData.val() === now" },
+            "$other": { ".validate": false }
+          }
+        },
+
+        "skipVotes": {
+          ".read": "auth != null",
+          "$uid": {
+            ".write": "auth != null && auth.uid === $uid && root.child('roomsLive').child($roomId).child('presence').child(auth.uid).exists()",
+            ".validate": "newData.isNumber()"
+          }
+        }
+      }
+    },
+
+    "roomChats": {
+      "$roomId": {
+        ".read": "auth != null && root.child('roomsLive').child($roomId).child('presence').child(auth.uid).exists()",
+        "$msgId": {
+          ".write": "auth != null && !data.exists() && root.child('roomsLive').child($roomId).child('presence').child(auth.uid).exists() && newData.child('uid').val() === auth.uid && (!root.child('throttle').child(auth.uid).child('chat').exists() || root.child('throttle').child(auth.uid).child('chat').val() < now - 800) && newData.parent().parent().parent().child('throttle').child(auth.uid).child('chat').val() === now",
+          ".validate": "newData.hasChildren(['uid', 'name', 'emoji', 'color', 'text', 'kind', 'ts'])",
+          "uid": { ".validate": "newData.isString()" },
+          "name": { ".validate": "newData.isString() && newData.val().length <= 20" },
+          "emoji": { ".validate": "newData.isString() && newData.val().length <= 8" },
+          "color": { ".validate": "newData.isNumber()" },
+          "text": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 500" },
+          "kind": { ".validate": "newData.val() === 'text' || newData.val() === 'dedication'" },
+          "to": { ".validate": "newData.isString() && newData.val().length <= 30" },
+          "track": { ".validate": "newData.hasChildren(['id', 'src', 't', 'a', 'u'])" },
+          "ts": { ".validate": "newData.val() === now" },
+          "$other": { ".validate": false }
+        }
+      }
+    },
+
+    "roomReactions": {
+      "$roomId": {
+        ".read": "auth != null && root.child('roomsLive').child($roomId).child('presence').child(auth.uid).exists()",
+        ".indexOn": ["ts"],
+        "$reactionId": {
+          ".write": "auth != null && !data.exists() && root.child('roomsLive').child($roomId).child('presence').child(auth.uid).exists() && newData.child('uid').val() === auth.uid && (!root.child('throttle').child(auth.uid).child('react').exists() || root.child('throttle').child(auth.uid).child('react').val() < now - 250) && newData.parent().parent().parent().child('throttle').child(auth.uid).child('react').val() === now",
+          ".validate": "newData.hasChildren(['uid', 'e', 'ts'])",
+          "uid": { ".validate": "newData.isString()" },
+          "e": { ".validate": "newData.isString() && newData.val().length <= 8" },
+          "ts": { ".validate": "newData.val() === now" },
+          "$other": { ".validate": false }
+        }
+      }
+    },
+
+    "throttle": {
+      "$uid": {
+        "$kind": {
+          ".write": "auth != null && auth.uid === $uid && ($kind === 'chat' || $kind === 'react')",
+          ".validate": "newData.val() === now"
+        }
+      }
+    }
+  }
+}

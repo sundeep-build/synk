@@ -1,0 +1,30 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "rooms",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "visibility", "order": "ASCENDING" },
+        { "fieldPath": "isLive", "order": "ASCENDING" },
+        { "fieldPath": "listenerCount", "order": "DESCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": [
+    {
+      "collectionGroup": "playlists",
+      "fieldPath": "tracks",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "likes",
+      "fieldPath": "track",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "rooms",
+      "fieldPath": "nowPlaying",
+      "indexes": []
+    }
+  ]
+}

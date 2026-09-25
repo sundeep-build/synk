@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Matches SynkPalette.ink950 so the launch screen blends into the first Flutter frame. -->
+    <color name="synk_launch_background">#05050B</color>
+    <color name="ic_launcher_background">#05050B</color>
+</resources>
